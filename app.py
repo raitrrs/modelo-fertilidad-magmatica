@@ -50,30 +50,38 @@ elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'B
 # =====================================================================
 # PANEL LATERAL (SIDEBAR)
 # =====================================================================
-st.sidebar.header("⚙️ Panel de Control")
-st.sidebar.write("Sube la matriz analítica del laboratorio.")
-archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'xlsx'])
 # =====================================================================
-# PANEL LATERAL (SIDEBAR)
+# PANEL LATERAL (SIDEBAR) - ACTUALIZADO
 # =====================================================================
 st.sidebar.header("⚙️ Panel de Control")
 
-# MENÚ DESPLEGABLE CON INSTRUCCIONES DE FORMATO
+# 1. Guía de formato (Desplegable)
 with st.sidebar.expander("ℹ️ Guía de Formato y Encabezados"):
     st.markdown("""
-    **Requisitos de la matriz de datos:**
-    * **Archivos aceptados:** `.csv` o Excel (`.xlsx`).
-    * **Limpieza:** La tabla solo debe contener números. Valores de laboratorio como `<0.01` o `N.D.` deben ser reemplazados por valores numéricos (ej. la mitad del límite de detección) antes de subir el archivo.
-    
-    **Columnas obligatorias (38 elementos):**
-    La primera fila de su archivo debe contener estrictamente estos encabezados en **mayúsculas**:
+    **Requisitos de la matriz:**
+    * **Archivos:** `.csv` o `.xlsx`.
+    * **Columnas obligatorias (mayúsculas):**
     `AU, AG, CU, PB, ZN, MO, NI, CO, CD, BI, FE, MN, TE, BA, CR, V, SN, W, LA, AL, MG, CA, NA, K, SR, Y, GA, LI, NB, SC, TA, TI, ZR, AS, SB, HG, PT, PD`
-    
-    *(Nota cartográfica: Puede incluir columnas adicionales llamadas `LATITUD` y `LONGITUD` en coordenadas geográficas para habilitar la renderización automática del mapa espacial).*
     """)
 
+# 2. Carga de archivo
 st.sidebar.write("Sube la matriz analítica del laboratorio.")
 archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'xlsx'])
+
+# 3. El botón de ejecución (ESTO ES LO QUE FALTABA)
+# Verificamos que el botón esté visible solo si ya hay un archivo subido
+if archivo_subido is not None:
+    ejecutar_modelo = st.sidebar.button("🚀 Ejecutar Modelo Predictivo")
+else:
+    ejecutar_modelo = False
+
+# =====================================================================
+# LÓGICA PRINCIPAL (CONECTADA AL BOTÓN)
+# =====================================================================
+if ejecutar_modelo:
+    # Aquí va toda tu lógica de predicción que ya tenías
+    with st.spinner('Evaluando firmas multivariadas...'):
+        # ... (resto de tu código de procesamiento)
 # =====================================================================
 # ÁREA PRINCIPAL
 # =====================================================================
