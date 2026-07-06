@@ -56,11 +56,17 @@ archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'x
 # =====================================================================
 # CONTADOR DE VISITAS
 # =====================================================================
+# =====================================================================
+# CONTADOR DE VISITAS
+# =====================================================================
 st.sidebar.markdown("---")
-url_app = "https://modelo-fertilidad.streamlit.app/#2-procesamiento-y-prediccion" 
+
+# Usamos un texto único sin espacios ni símbolos raros en lugar del "https://"
+id_unico = "modelo_fertilidad_uce" 
+
 contador_html = f"""
 <div style="text-align: center;">
-    <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url={url_app}&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=Visitas&edge_flat=false" alt="Contador de visitas">
+    <img src="https://api.visitorbadge.io/api/visitors?path={id_unico}&label=Visitas&countColor=%23d9534f&style=flat&labelStyle=upper" alt="Contador de visitas">
 </div>
 """
 st.sidebar.markdown(contador_html, unsafe_allow_html=True)
