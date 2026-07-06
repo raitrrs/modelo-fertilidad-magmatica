@@ -2,81 +2,111 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import io
 
 # =====================================================================
-# CONFIGURACIÓN Y CARGA DE COMPONENTES
+# CONFIGURACIÓN DE LA PÁGINA
 # =====================================================================
-st.set_page_config(page_title="Geoquímica Predictiva", layout="wide")
-st.title("Clasificador de Fertilidad Magmática multivariado")
-st.markdown("Plataforma de procesamiento masivo para bases de datos litogeoquímicas.")
+st.set_page_config(page_title="Prospectividad Alausí", layout="wide", page_icon="🌋")
 
+# Título principal y descripción
+st.title("Clasificador de Fertilidad Magmática")
+st.markdown("Plataforma de inferencia multivariada para caracterización litogeoquímica.")
+st.markdown("---")
+
+# =====================================================================
+# CARGA DE MODELOS (CACHÉ)
+# =====================================================================
 @st.cache_resource
 def cargar_modelos():
-    # 1. Cargar el escalador matemático correcto
     scaler = joblib.load('scaler_geoquimico.pkl')
-    # 2. Cargar el modelo Random Forest (No Keras)
     modelo = joblib.load('modelo_fertilidad_rf.pkl')
     return scaler, modelo
 
 scaler, modelo_rf = cargar_modelos()
 
-# =====================================================================
-# INTERFAZ DE CARGA DE DATOS
-# =====================================================================
-st.subheader("1. Ingesta de Datos Analíticos")
-archivo_subido = st.file_uploader("Sube tu matriz geoquímica (formato CSV o Excel)", type=['csv', 'xlsx'])
+# Lista estricta de elementos (Garantiza que no entren coordenadas al modelo)
+elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'BI',
+                        'FE', 'MN', 'TE', 'BA', 'CR', 'V', 'SN', 'W', 'LA', 'AL',
+                        'MG', 'CA', 'NA', 'K', 'SR', 'Y', 'GA', 'LI', 'NB', 'SC',
+                        'TA', 'TI', 'ZR', 'AS', 'SB', 'HG', 'PT', 'PD']
 
+# =====================================================================
+# PANEL LATERAL (SIDEBAR) - INGESTA DE DATOS
+# =====================================================================
+st.sidebar.header("⚙️ Panel de Control")
+st.sidebar.write("Sube la matriz analítica del laboratorio para su evaluación.")
+archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'xlsx'])
+
+# =====================================================================
+# ÁREA PRINCIPAL - PROCESAMIENTO Y RESULTADOS
+# =====================================================================
 if archivo_subido is not None:
-    # Leer el archivo dependiendo de su extensión
+    # Leer el archivo
     if archivo_subido.name.endswith('.csv'):
         df_input = pd.read_csv(archivo_subido)
     else:
         df_input = pd.read_excel(archivo_subido)
         
-    st.write(f"Archivo cargado exitosamente. Total de muestras detectadas: {len(df_input)}")
+    st.sidebar.success(f"Archivo cargado: {len(df_input)} muestras.")
     
-    # =====================================================================
-    # MOTOR DE INFERENCIA
-    # =====================================================================
-    st.subheader("2. Procesamiento y Predicción")
-    if st.button("Ejecutar Modelo Predictivo"):
+    # Botón de ejecución en el sidebar
+    if st.sidebar.button("🚀 Ejecutar Modelo Predictivo"):
         with st.spinner('Evaluando firmas multivariadas...'):
             try:
-                # Extraer solo las variables numéricas
-                datos_numericos = df_input.select_dtypes(include=[np.number])
+                # 1. FILTRADO ESTRICTO: Seleccionar solo las 38 columnas químicas
+                datos_modelo = df_input[elementos_requeridos].copy()
                 
-                # Preprocesamiento idéntico al entrenamiento (Log10 + StandardScaler)
-                datos_log = np.log10(datos_numericos + 1e-5)
+                # 2. Preprocesamiento (Log10 + StandardScaler)
+                datos_log = np.log10(datos_modelo + 1e-5)
                 datos_escalados = scaler.transform(datos_log)
                 
-                # Predicción del modelo Random Forest
-                # predict_proba devuelve dos columnas [prob_esteril, prob_fertil], tomamos la segunda (índice 1)
+                # 3. Inferencia Random Forest
                 probabilidades = modelo_rf.predict_proba(datos_escalados)[:, 1]
                 
-                # Añadir los resultados al DataFrame original
-                df_input['Probabilidad_Fertilidad'] = probabilidades
-                df_input['Clasificacion_IA'] = np.where(df_input['Probabilidad_Fertilidad'] > 0.5, 'Fértil', 'Estéril/Artefacto')
-                
-                st.success("¡Clasificación completada con éxito!")
-                
-                # Mostrar la tabla interactiva en la web
-                st.dataframe(df_input.head(15))
+                # 4. Asignación de resultados
+                df_input['Prob_Fertilidad'] = probabilidades
+                df_input['Clasificacion_IA'] = np.where(df_input['Prob_Fertilidad'] > 0.5, 'Fértil', 'Estéril/Artefacto')
                 
                 # =====================================================================
-                # EXPORTACIÓN DE RESULTADOS
+                # KPIS Y MÉTRICAS DE IMPACTO VISUAL
                 # =====================================================================
-                st.subheader("3. Descarga de Resultados")
+                st.subheader("📊 Resumen Analítico")
                 
-                # Preparar el CSV en memoria para la descarga
+                total_muestras = len(df_input)
+                muestras_fertiles = len(df_input[df_input['Clasificacion_IA'] == 'Fértil'])
+                porcentaje_anomalias = (muestras_fertiles / total_muestras) * 100
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric(label="Total Muestras Analizadas", value=total_muestras)
+                with col2:
+                    st.metric(label="Blancos Fértiles Detectados", value=muestras_fertiles)
+                with col3:
+                    st.metric(label="Tasa de Anomalía", value=f"{porcentaje_anomalias:.2f}%")
+                
+                st.markdown("---")
+                
+                # =====================================================================
+                # TABLA DE RESULTADOS Y DESCARGA
+                # =====================================================================
+                st.subheader("📄 Base de Datos Clasificada")
+                
+                # Mostrar el DataFrame destacando las últimas columnas añadidas
+                st.dataframe(df_input, use_container_width=True)
+                
+                # Preparar descarga
                 csv_buffer = df_input.to_csv(index=False).encode('utf-8')
-                
-                st.download_button(
-                    label="Descargar Base de Datos Clasificada (CSV)",
+                st.sidebar.markdown("---")
+                st.sidebar.download_button(
+                    label="📥 Descargar Resultados (CSV)",
                     data=csv_buffer,
-                    file_name="predicciones_fertilidad.csv",
+                    file_name="Alausí_Resultados_Predictivos.csv",
                     mime="text/csv"
                 )
                 
+            except KeyError as e:
+                st.error(f"⚠️ Error de formato: El archivo subido no contiene la columna {e}. Verifica que estén los 38 elementos químicos requeridos.")
             except Exception as e:
-                st.error(f"Error de procesamiento: Asegúrate de que el archivo contenga los mismos elementos químicos del entrenamiento. Detalles: {e}")
+                st.error(f"⚠️ Error inesperado: {e}")
+else:
+    st.info("👈 Por favor, carga una matriz de datos en el panel lateral para iniciar el análisis.")
