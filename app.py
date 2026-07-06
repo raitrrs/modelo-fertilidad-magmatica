@@ -53,6 +53,17 @@ elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'B
 st.sidebar.header("⚙️ Panel de Control")
 st.sidebar.write("Sube la matriz analítica del laboratorio.")
 archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'xlsx'])
+# =====================================================================
+# CONTADOR DE VISITAS
+# =====================================================================
+st.sidebar.markdown("---")
+url_app = "https://modelo-fertilidad.streamlit.app/#2-procesamiento-y-prediccion" 
+contador_html = f"""
+<div style="text-align: center;">
+    <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url={url_app}&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=Visitas&edge_flat=false" alt="Contador de visitas">
+</div>
+"""
+st.sidebar.markdown(contador_html, unsafe_allow_html=True)
 
 # =====================================================================
 # ÁREA PRINCIPAL
