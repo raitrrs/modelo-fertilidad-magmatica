@@ -107,6 +107,23 @@ if ejecutar_modelo:
             
             with tab2:
                 st.subheader("Análisis Multivariado de Fertilidad Magmática")
+                
+                # --- LÓGICA DE INTERPRETACIÓN AUTOMÁTICA ---
+                st.markdown("### 🤖 Interpretación Geológica Asistida")
+                prob_promedio = df_input['Prob_Fertilidad'].mean()
+                num_anomalias = len(df_input[df_input['Clasificacion_IA'] == 'Fértil'])
+                
+                if prob_promedio > 0.6:
+                    resumen_nlp = f"El conjunto de datos presenta una **alta prospectividad magmática**, con un promedio de fertilidad del {prob_promedio:.1%} y {num_anomalias} muestras clasificadas como fértiles. Se sugiere priorizar las zonas con razones Sr/Y elevadas."
+                elif prob_promedio > 0.3:
+                    resumen_nlp = "Se detectó una **prospectividad moderada**. El sistema muestra firmas geoquímicas mixtas, indicando zonas de transición que requieren un análisis más detallado de la alteración potásica (Cu/K)."
+                else:
+                    resumen_nlp = "El sistema presenta una **baja fertilidad magmática** predominante. Los indicadores de fraccionamiento Fe/Cr sugieren una firma de arco volcánico poco evolucionado o estéril para depósitos tipo pórfido."
+                
+                st.info(resumen_nlp)
+                
+        
+                st.subheader("Análisis Multivariado de Fertilidad Magmática")
                 fig = plt.figure(figsize=(16, 12))
                 cmap_prob = 'coolwarm'
                 
