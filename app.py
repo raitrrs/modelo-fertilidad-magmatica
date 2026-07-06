@@ -106,10 +106,52 @@ if ejecutar_modelo:
                 st.dataframe(df_input.head(1000).style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), use_container_width=True)
             
             with tab2:
-                fig = plt.figure(figsize=(12, 8))
-                # Ejemplo de un gráfico rápido de los diagramas (Sr/Y vs Y)
-                sns.scatterplot(data=df_input, x='Y', y='Sr_Y', hue='Prob_Fertilidad', palette='coolwarm')
-                plt.xscale('log'); plt.yscale('log')
+                st.subheader("Análisis Multivariado de Fertilidad Magmática")
+                fig = plt.figure(figsize=(16, 12))
+                cmap_prob = 'coolwarm'
+                
+                # 1. Sr/Y vs Y
+                ax1 = fig.add_subplot(231)
+                sns.scatterplot(data=df_input, x='Y', y='Sr_Y', hue='Prob_Fertilidad', palette=cmap_prob, s=20, alpha=0.7, ax=ax1)
+                ax1.set_xscale('log'); ax1.set_yscale('log'); ax1.axhline(20, color='gray', linestyle='--')
+                ax1.set_title('Fertilidad: Sr/Y vs Y')
+
+                # 2. Spider
+                ax2 = fig.add_subplot(232)
+                trace_elems = ['LA', 'SR', 'Y', 'ZR', 'TI', 'V', 'SC', 'CU', 'ZN', 'PB']
+                means_fert = df_input[df_input['Clasificacion_IA'] == 'Fértil'][trace_elems].mean()
+                means_inf = df_input[df_input['Clasificacion_IA'] != 'Fértil'][trace_elems].mean()
+                ax2.plot(trace_elems, np.log10(means_fert + 1e-5), marker='o', color='darkred', label='Fértil')
+                ax2.plot(trace_elems, np.log10(means_inf + 1e-5), marker='s', color='darkblue', label='Estéril')
+                ax2.set_title('Spider de Elementos (Log10)')
+                ax2.legend()
+
+                # 3. Ternario AFM
+                ax3 = fig.add_subplot(233)
+                A, F, M = df_input['NA'] + df_input['K'], df_input['FE'], df_input['MG']
+                Total = A + F + M + 1e-5
+                X_tern, Y_tern = (M/Total) + (F/Total)/2.0, (F/Total) * np.sqrt(3)/2.0
+                ax3.scatter(X_tern, Y_tern, c=df_input['Prob_Fertilidad'], cmap=cmap_prob, s=20)
+                ax3.plot([0, 1, 0.5, 0], [0, 0, np.sqrt(3)/2, 0], 'k-', lw=1.5)
+                ax3.set_title('Diagrama Ternario AFM')
+                ax3.axis('off')
+
+                # 4. Fe vs Cr
+                ax4 = fig.add_subplot(234)
+                sns.scatterplot(data=df_input, x='CR', y='FE', hue='Prob_Fertilidad', palette=cmap_prob, s=20, ax=ax4)
+                ax4.set_xscale('log'); ax4.set_yscale('log'); ax4.set_title('IA: Fe vs Cr')
+
+                # 5. Cu vs K
+                ax5 = fig.add_subplot(235)
+                sns.scatterplot(data=df_input, x='K', y='CU', hue='Prob_Fertilidad', palette=cmap_prob, s=20, ax=ax5)
+                ax5.set_xscale('log'); ax5.set_yscale('log'); ax5.set_title('IA: Cu vs K')
+
+                # 6. V vs Ti
+                ax6 = fig.add_subplot(236)
+                sns.scatterplot(data=df_input, x='TI', y='V', hue='Prob_Fertilidad', palette=cmap_prob, s=20, ax=ax6)
+                ax6.set_xscale('log'); ax6.set_yscale('log'); ax6.set_title('IA: V vs Ti')
+
+                plt.tight_layout()
                 st.pyplot(fig)
             
             with tab3:
