@@ -4,6 +4,18 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
+import streamlit as st
+import pandas as pd
+import numpy as np
+import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.interpolate import griddata
+
+# Quitar el límite de celdas coloreadas en Pandas
+pd.set_option("styler.render.max_elements", 2000000) 
+
+
 from scipy.interpolate import griddata
 
 # =====================================================================
