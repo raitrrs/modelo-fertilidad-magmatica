@@ -106,21 +106,15 @@ if ejecutar_modelo:
                 st.dataframe(df_input.head(1000).style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), use_container_width=True)
             
             with tab2:
-                st.subheader("Análisis Multivariado de Fertilidad Magmática")
-                
-                # --- LÓGICA DE INTERPRETACIÓN AUTOMÁTICA ---
-                st.markdown("### 🤖 Interpretación Geológica Asistida")
-                prob_promedio = df_input['Prob_Fertilidad'].mean()
-                num_anomalias = len(df_input[df_input['Clasificacion_IA'] == 'Fértil'])
-                
-                if prob_promedio > 0.6:
-                    resumen_nlp = f"El conjunto de datos presenta una **alta prospectividad magmática**, con un promedio de fertilidad del {prob_promedio:.1%} y {num_anomalias} muestras clasificadas como fértiles. Se sugiere priorizar las zonas con razones Sr/Y elevadas."
-                elif prob_promedio > 0.3:
-                    resumen_nlp = "Se detectó una **prospectividad moderada**. El sistema muestra firmas geoquímicas mixtas, indicando zonas de transición que requieren un análisis más detallado de la alteración potásica (Cu/K)."
-                else:
-                    resumen_nlp = "El sistema presenta una **baja fertilidad magmática** predominante. Los indicadores de fraccionamiento Fe/Cr sugieren una firma de arco volcánico poco evolucionado o estéril para depósitos tipo pórfido."
-                
-                st.info(resumen_nlp)
+               st.subheader("Análisis de Fertilidad con IA")
+    
+    # Botón para activar el análisis de Gemini
+    if st.button("Generar Reporte Geológico con Gemini"):
+        with st.spinner('Consultando a Gemini...'):
+            # Enviamos un resumen estadístico (promedios) para no saturar el token limit
+            resumen_stats = df_input.groupby('Clasificacion_IA')[elementos_requeridos].mean()
+            texto_reporte = generar_interpretacion_llm(resumen_stats)
+            st.write(texto_reporte)
                 
         
                 st.subheader("Análisis Multivariado de Fertilidad Magmática")
