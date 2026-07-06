@@ -13,10 +13,15 @@ st.set_page_config(page_title="Prospectividad Alausí", layout="wide", page_icon
 sns.set_theme(style="whitegrid")
 
 # Configuración API Gemini
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-1.5-flash')
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    st.error("API Key no configurada en los secretos de Streamlit.")
 
-# Inicializar estado para que el reporte no desaparezca
+# --- INICIALIZACIÓN DE SESIÓN (PERSISTENCIA) ---
+if 'df_input' not in st.session_state:
+    st.session_state.df_input = None
 if 'reporte_gemini' not in st.session_state:
     st.session_state.reporte_gemini = ""
 
@@ -40,64 +45,57 @@ st.title("Clasificador de Fertilidad Magmática")
 st.sidebar.header("⚙️ Panel de Control")
 
 archivo_subido = st.sidebar.file_uploader("Cargar archivo", type=['csv', 'xlsx'])
-ejecutar_modelo = st.sidebar.button("🚀 Ejecutar Modelo Predictivo") if archivo_subido else False
+
+# Botón principal de ejecución
+if st.sidebar.button("🚀 Ejecutar Modelo Predictivo"):
+    if archivo_subido:
+        with st.spinner('Procesando datos...'):
+            try:
+                df = pd.read_csv(archivo_subido) if archivo_subido.name.endswith('.csv') else pd.read_excel(archivo_subido)
+                datos_modelo = df[elementos_requeridos].copy()
+                datos_escalados = scaler.transform(np.log10(datos_modelo + 1e-5))
+                
+                df['Prob_Fertilidad'] = modelo_rf.predict_proba(datos_escalados)[:, 1]
+                df['Clasificacion_IA'] = np.where(df['Prob_Fertilidad'] > 0.5, 'Fértil', 'Estéril/Artefacto')
+                df['Sr_Y'] = df['SR'] / df['Y']
+                
+                # Guardar en sesión
+                st.session_state.df_input = df
+                st.session_state.reporte_gemini = "" # Resetear reporte si se carga archivo nuevo
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 # =====================================================================
-# LÓGICA PRINCIPAL
+# LÓGICA PRINCIPAL (MOSTRAR SI HAY DATOS)
 # =====================================================================
-if ejecutar_modelo:
-    with st.spinner('Procesando...'):
-        try:
-            df_input = pd.read_csv(archivo_subido) if archivo_subido.name.endswith('.csv') else pd.read_excel(archivo_subido)
-            datos_modelo = df_input[elementos_requeridos].copy()
-            datos_escalados = scaler.transform(np.log10(datos_modelo + 1e-5))
-            
-            df_input['Prob_Fertilidad'] = modelo_rf.predict_proba(datos_escalados)[:, 1]
-            df_input['Clasificacion_IA'] = np.where(df_input['Prob_Fertilidad'] > 0.5, 'Fértil', 'Estéril/Artefacto')
-            df_input['Sr_Y'] = df_input['SR'] / df_input['Y']
-            
-            tab1, tab2, tab3 = st.tabs(["📄 Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa"])
-            
-            with tab1:
-                st.subheader("📊 Resumen Analítico")
-                col1, col2, col3 = st.columns(3)
-                total = len(df_input)
-                fertiles = len(df_input[df_input['Clasificacion_IA'] == 'Fértil'])
-                col1.metric("Total Muestras", total)
-                col2.metric("Blancos Fértiles", fertiles)
-                col3.metric("Tasa de Anomalía", f"{(fertiles/total)*100:.2f}%")
-                st.dataframe(df_input.head(1000).style.applymap(lambda x: 'background-color: #ffcccc' if x == 'Fértil' else '', subset=['Clasificacion_IA']))
-            
-            with tab2:
-                st.subheader("Análisis Geoquímico Completo")
-                # Botón Gemini
-                if st.button("Generar Reporte con Gemini"):
-                    resumen = df_input.groupby('Clasificacion_IA')[elementos_requeridos].mean().to_string()
-                    prompt = f"Eres geólogo experto en pórfidos. Analiza: {resumen}. Reporte técnico de 100 palabras."
-                    st.session_state.reporte_gemini = model.generate_content(prompt).text
-                
-                if st.session_state.reporte_gemini:
-                    st.info(st.session_state.reporte_gemini)
-                
-                # Gráficos (6 paneles)
-                fig, axs = plt.subplots(2, 3, figsize=(16, 10))
-                axs = axs.flatten()
-                
-                sns.scatterplot(data=df_input, x='Y', y='Sr_Y', hue='Prob_Fertilidad', ax=axs[0]); axs[0].set_xscale('log'); axs[0].set_yscale('log')
-                sns.scatterplot(data=df_input, x='CR', y='FE', hue='Prob_Fertilidad', ax=axs[1]); axs[1].set_xscale('log'); axs[1].set_yscale('log')
-                sns.scatterplot(data=df_input, x='K', y='CU', hue='Prob_Fertilidad', ax=axs[2]); axs[2].set_xscale('log'); axs[2].set_yscale('log')
-                sns.scatterplot(data=df_input, x='TI', y='V', hue='Prob_Fertilidad', ax=axs[3]); axs[3].set_xscale('log'); axs[3].set_yscale('log')
-                sns.histplot(data=df_input, x='Prob_Fertilidad', ax=axs[4])
-                sns.boxplot(data=df_input, x='Clasificacion_IA', y='AU', ax=axs[5])
-                
-                plt.tight_layout()
-                st.pyplot(fig)
-            
-            with tab3:
-                if 'LONGITUD' in df_input.columns:
-                    grid_x, grid_y = np.mgrid[df_input['LONGITUD'].min():df_input['LONGITUD'].max():200j, df_input['LATITUD'].min():df_input['LATITUD'].max():200j]
-                    plt.imshow(griddata((df_input['LONGITUD'], df_input['LATITUD']), df_input['Prob_Fertilidad'], (grid_x, grid_y), method='linear').T, origin='lower', cmap='coolwarm')
-                    st.pyplot(plt.gcf())
-            
-        except Exception as e:
-            st.error(f"⚠️ Error: {e}")
+if st.session_state.df_input is not None:
+    df = st.session_state.df_input
+    
+    tab1, tab2, tab3 = st.tabs(["📄 Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa"])
+    
+    with tab1:
+        st.subheader("Resumen Analítico")
+        total = len(df)
+        fertiles = len(df[df['Clasificacion_IA'] == 'Fértil'])
+        st.metric("Total Muestras", total)
+        st.dataframe(df.head(1000).style.applymap(lambda x: 'background-color: #ffcccc' if x == 'Fértil' else '', subset=['Clasificacion_IA']))
+    
+    with tab2:
+        st.subheader("Análisis Geoquímico")
+        
+        if st.button("Generar Reporte con Gemini"):
+            resumen = df.groupby('Clasificacion_IA')[elementos_requeridos].mean().to_string()
+            prompt = f"Analiza estos promedios geoquímicos: {resumen}. Eres un geólogo experto en pórfidos. Dame un reporte de 100 palabras."
+            st.session_state.reporte_gemini = model.generate_content(prompt).text
+        
+        if st.session_state.reporte_gemini:
+            st.info(st.session_state.reporte_gemini)
+        
+        # Gráficos
+        fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+        sns.scatterplot(data=df, x='Y', y='Sr_Y', hue='Prob_Fertilidad', ax=axs[0,0], palette='coolwarm')
+        sns.scatterplot(data=df, x='CR', y='FE', hue='Prob_Fertilidad', ax=axs[0,1], palette='coolwarm')
+        sns.scatterplot(data=df, x='K', y='CU', hue='Prob_Fertilidad', ax=axs[1,0], palette='coolwarm')
+        sns.histplot(data=df, x='Prob_Fertilidad', ax=axs[1,1])
+        plt.tight_layout()
+        st.pyplot(fig)
