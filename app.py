@@ -190,4 +190,23 @@ if ejecutar_modelo:
         except Exception as e:
             st.error(f"⚠️ Error: {e}")
 else:
+
+import google.generativeai as genai
+
+# Configurar API
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+def generar_interpretacion_llm(df_resumen):
+    # Convertimos una muestra del df a texto para que Gemini lo analice
+    contexto = df_resumen.to_string()
+    prompt = f"""
+    Eres un geólogo experto en exploración de pórfidos cupríferos. 
+    Analiza este resumen estadístico de una prospección geoquímica: 
+    {contexto}
+    Genera un párrafo técnico (máximo 100 palabras) sobre la prospectividad 
+    magmática y recomendaciones para la siguiente etapa de exploración.
+    """
+    response = model.generate_content(prompt)
+    return response.text
     st.info("👈 Sube un archivo en el panel lateral para comenzar.")
