@@ -54,23 +54,26 @@ st.sidebar.header("⚙️ Panel de Control")
 st.sidebar.write("Sube la matriz analítica del laboratorio.")
 archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'xlsx'])
 # =====================================================================
-# CONTADOR DE VISITAS
+# PANEL LATERAL (SIDEBAR)
 # =====================================================================
-# =====================================================================
-# CONTADOR DE VISITAS
-# =====================================================================
-st.sidebar.markdown("---")
+st.sidebar.header("⚙️ Panel de Control")
 
-# Usamos un texto único sin espacios ni símbolos raros en lugar del "https://"
-id_unico = "modelo_fertilidad_uce" 
+# MENÚ DESPLEGABLE CON INSTRUCCIONES DE FORMATO
+with st.sidebar.expander("ℹ️ Guía de Formato y Encabezados"):
+    st.markdown("""
+    **Requisitos de la matriz de datos:**
+    * **Archivos aceptados:** `.csv` o Excel (`.xlsx`).
+    * **Limpieza:** La tabla solo debe contener números. Valores de laboratorio como `<0.01` o `N.D.` deben ser reemplazados por valores numéricos (ej. la mitad del límite de detección) antes de subir el archivo.
+    
+    **Columnas obligatorias (38 elementos):**
+    La primera fila de su archivo debe contener estrictamente estos encabezados en **mayúsculas**:
+    `AU, AG, CU, PB, ZN, MO, NI, CO, CD, BI, FE, MN, TE, BA, CR, V, SN, W, LA, AL, MG, CA, NA, K, SR, Y, GA, LI, NB, SC, TA, TI, ZR, AS, SB, HG, PT, PD`
+    
+    *(Nota cartográfica: Puede incluir columnas adicionales llamadas `LATITUD` y `LONGITUD` en coordenadas geográficas para habilitar la renderización automática del mapa espacial).*
+    """)
 
-contador_html = f"""
-<div style="text-align: center;">
-    <img src="https://api.visitorbadge.io/api/visitors?path={id_unico}&label=Visitas&countColor=%23d9534f&style=flat&labelStyle=upper" alt="Contador de visitas">
-</div>
-"""
-st.sidebar.markdown(contador_html, unsafe_allow_html=True)
-
+st.sidebar.write("Sube la matriz analítica del laboratorio.")
+archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'xlsx'])
 # =====================================================================
 # ÁREA PRINCIPAL
 # =====================================================================
