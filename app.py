@@ -12,7 +12,7 @@ pd.set_option("styler.render.max_elements", 2000000)
 st.set_page_config(page_title="Prospectividad Alausí", layout="wide", page_icon="🌋")
 sns.set_theme(style="whitegrid")
 
-# Configuración API Gemini
+# Configuración API Gemini (Asegúrate de tener la clave en Streamlit Secrets)
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 
@@ -29,10 +29,9 @@ elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'B
                         'MG', 'CA', 'NA', 'K', 'SR', 'Y', 'GA', 'LI', 'NB', 'SC',
                         'TA', 'TI', 'ZR', 'AS', 'SB', 'HG', 'PT', 'PD']
 
-# Función Gemini
 def generar_interpretacion_llm(df_resumen):
     contexto = df_resumen.to_string()
-    prompt = f"Eres un geólogo experto en pórfidos. Analiza este resumen estadístico: {contexto}. Genera un reporte técnico de 100 palabras."
+    prompt = f"Eres un geólogo experto en pórfidos. Analiza este resumen estadístico: {contexto}. Genera un reporte técnico de 100 palabras sobre la prospectividad."
     return model.generate_content(prompt).text
 
 # =====================================================================
@@ -67,7 +66,16 @@ if ejecutar_modelo:
             tab1, tab2, tab3 = st.tabs(["📄 Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa"])
             
             with tab1:
-                st.metric("Total Muestras", len(df_input))
+                st.subheader("📊 Resumen Analítico")
+                col1, col2, col3 = st.columns(3)
+                total = len(df_input)
+                fertiles = len(df_input[df_input['Clasificacion_IA'] == 'Fértil'])
+                tasa = (fertiles / total) * 100 if total > 0 else 0
+                
+                col1.metric("Total Muestras", total)
+                col2.metric("Blancos Fértiles", fertiles)
+                col3.metric("Tasa de Anomalía", f"{tasa:.2f}%")
+                
                 st.dataframe(df_input.head(1000).style.applymap(lambda x: 'background-color: #ffcccc' if x == 'Fértil' else '', subset=['Clasificacion_IA']))
             
             with tab2:
@@ -75,6 +83,7 @@ if ejecutar_modelo:
                     st.write(generar_interpretacion_llm(df_input.groupby('Clasificacion_IA')[elementos_requeridos].mean()))
                 
                 fig = plt.figure(figsize=(12, 8))
+                # Ejemplo de un gráfico rápido
                 sns.scatterplot(data=df_input, x='Y', y=df_input['SR']/df_input['Y'], hue='Prob_Fertilidad', palette='coolwarm')
                 plt.xscale('log'); plt.yscale('log'); plt.title('Fertilidad: Sr/Y vs Y')
                 st.pyplot(fig)
