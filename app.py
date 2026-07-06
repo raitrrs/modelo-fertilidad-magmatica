@@ -12,9 +12,13 @@ pd.set_option("styler.render.max_elements", 2000000)
 st.set_page_config(page_title="Prospectividad Alausí", layout="wide", page_icon="🌋")
 sns.set_theme(style="whitegrid")
 
-# Configuración API Gemini (Asegúrate de tener la clave en Streamlit Secrets)
+# Configuración API Gemini
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
+
+# Inicializar estado para que el reporte no desaparezca
+if 'reporte_gemini' not in st.session_state:
+    st.session_state.reporte_gemini = ""
 
 @st.cache_resource
 def cargar_modelos():
@@ -29,26 +33,14 @@ elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'B
                         'MG', 'CA', 'NA', 'K', 'SR', 'Y', 'GA', 'LI', 'NB', 'SC',
                         'TA', 'TI', 'ZR', 'AS', 'SB', 'HG', 'PT', 'PD']
 
-def generar_interpretacion_llm(df_resumen):
-    contexto = df_resumen.to_string()
-    prompt = f"Eres un geólogo experto en pórfidos. Analiza este resumen estadístico: {contexto}. Genera un reporte técnico de 100 palabras sobre la prospectividad."
-    return model.generate_content(prompt).text
-
 # =====================================================================
 # INTERFAZ Y SIDEBAR
 # =====================================================================
 st.title("Clasificador de Fertilidad Magmática")
 st.sidebar.header("⚙️ Panel de Control")
 
-with st.sidebar.expander("ℹ️ Guía de Formato"):
-    st.markdown("Sube un CSV/Excel con las 38 columnas: " + ", ".join(elementos_requeridos))
-
 archivo_subido = st.sidebar.file_uploader("Cargar archivo", type=['csv', 'xlsx'])
 ejecutar_modelo = st.sidebar.button("🚀 Ejecutar Modelo Predictivo") if archivo_subido else False
-
-# Contador
-st.sidebar.markdown("---")
-st.sidebar.markdown(f'<div style="text-align: center;"><img src="https://api.visitorbadge.io/api/visitors?path=modelo_fertilidad_alausi_uce&label=Visitas&countColor=%23d9534f" alt="Contador"></div>', unsafe_allow_html=True)
 
 # =====================================================================
 # LÓGICA PRINCIPAL
@@ -62,6 +54,7 @@ if ejecutar_modelo:
             
             df_input['Prob_Fertilidad'] = modelo_rf.predict_proba(datos_escalados)[:, 1]
             df_input['Clasificacion_IA'] = np.where(df_input['Prob_Fertilidad'] > 0.5, 'Fértil', 'Estéril/Artefacto')
+            df_input['Sr_Y'] = df_input['SR'] / df_input['Y']
             
             tab1, tab2, tab3 = st.tabs(["📄 Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa"])
             
@@ -70,22 +63,34 @@ if ejecutar_modelo:
                 col1, col2, col3 = st.columns(3)
                 total = len(df_input)
                 fertiles = len(df_input[df_input['Clasificacion_IA'] == 'Fértil'])
-                tasa = (fertiles / total) * 100 if total > 0 else 0
-                
                 col1.metric("Total Muestras", total)
                 col2.metric("Blancos Fértiles", fertiles)
-                col3.metric("Tasa de Anomalía", f"{tasa:.2f}%")
-                
+                col3.metric("Tasa de Anomalía", f"{(fertiles/total)*100:.2f}%")
                 st.dataframe(df_input.head(1000).style.applymap(lambda x: 'background-color: #ffcccc' if x == 'Fértil' else '', subset=['Clasificacion_IA']))
             
             with tab2:
-                if st.button("Generar Reporte Geológico con Gemini"):
-                    st.write(generar_interpretacion_llm(df_input.groupby('Clasificacion_IA')[elementos_requeridos].mean()))
+                st.subheader("Análisis Geoquímico Completo")
+                # Botón Gemini
+                if st.button("Generar Reporte con Gemini"):
+                    resumen = df_input.groupby('Clasificacion_IA')[elementos_requeridos].mean().to_string()
+                    prompt = f"Eres geólogo experto en pórfidos. Analiza: {resumen}. Reporte técnico de 100 palabras."
+                    st.session_state.reporte_gemini = model.generate_content(prompt).text
                 
-                fig = plt.figure(figsize=(12, 8))
-                # Ejemplo de un gráfico rápido
-                sns.scatterplot(data=df_input, x='Y', y=df_input['SR']/df_input['Y'], hue='Prob_Fertilidad', palette='coolwarm')
-                plt.xscale('log'); plt.yscale('log'); plt.title('Fertilidad: Sr/Y vs Y')
+                if st.session_state.reporte_gemini:
+                    st.info(st.session_state.reporte_gemini)
+                
+                # Gráficos (6 paneles)
+                fig, axs = plt.subplots(2, 3, figsize=(16, 10))
+                axs = axs.flatten()
+                
+                sns.scatterplot(data=df_input, x='Y', y='Sr_Y', hue='Prob_Fertilidad', ax=axs[0]); axs[0].set_xscale('log'); axs[0].set_yscale('log')
+                sns.scatterplot(data=df_input, x='CR', y='FE', hue='Prob_Fertilidad', ax=axs[1]); axs[1].set_xscale('log'); axs[1].set_yscale('log')
+                sns.scatterplot(data=df_input, x='K', y='CU', hue='Prob_Fertilidad', ax=axs[2]); axs[2].set_xscale('log'); axs[2].set_yscale('log')
+                sns.scatterplot(data=df_input, x='TI', y='V', hue='Prob_Fertilidad', ax=axs[3]); axs[3].set_xscale('log'); axs[3].set_yscale('log')
+                sns.histplot(data=df_input, x='Prob_Fertilidad', ax=axs[4])
+                sns.boxplot(data=df_input, x='Clasificacion_IA', y='AU', ax=axs[5])
+                
+                plt.tight_layout()
                 st.pyplot(fig)
             
             with tab3:
@@ -93,8 +98,6 @@ if ejecutar_modelo:
                     grid_x, grid_y = np.mgrid[df_input['LONGITUD'].min():df_input['LONGITUD'].max():200j, df_input['LATITUD'].min():df_input['LATITUD'].max():200j]
                     plt.imshow(griddata((df_input['LONGITUD'], df_input['LATITUD']), df_input['Prob_Fertilidad'], (grid_x, grid_y), method='linear').T, origin='lower', cmap='coolwarm')
                     st.pyplot(plt.gcf())
-            
-            st.sidebar.download_button("📥 Descargar Resultados", data=df_input.to_csv(index=False).encode('utf-8'), file_name="Resultados.csv")
             
         except Exception as e:
             st.error(f"⚠️ Error: {e}")
