@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-from tensorflow.keras.models import load_model
 import io
 
 # =====================================================================
@@ -14,11 +13,13 @@ st.markdown("Plataforma de procesamiento masivo para bases de datos litogeoquím
 
 @st.cache_resource
 def cargar_modelos():
-    scaler = joblib.load('modelo_fertilidad_rf.pkl')
-    modelo = load_model('modelo_fertilidad.keras', compile=False)
+    # 1. Cargar el escalador matemático correcto
+    scaler = joblib.load('scaler_geoquimico.pkl')
+    # 2. Cargar el modelo Random Forest (No Keras)
+    modelo = joblib.load('modelo_fertilidad_rf.pkl')
     return scaler, modelo
 
-scaler, modelo_nn = cargar_modelos()
+scaler, modelo_rf = cargar_modelos()
 
 # =====================================================================
 # INTERFAZ DE CARGA DE DATOS
@@ -36,25 +37,25 @@ if archivo_subido is not None:
     st.write(f"Archivo cargado exitosamente. Total de muestras detectadas: {len(df_input)}")
     
     # =====================================================================
-# MOTOR DE INFERENCIA
-# =====================================================================
+    # MOTOR DE INFERENCIA
+    # =====================================================================
     st.subheader("2. Procesamiento y Predicción")
-    if st.button("Ejecutar Red Neuronal"):
+    if st.button("Ejecutar Modelo Predictivo"):
         with st.spinner('Evaluando firmas multivariadas...'):
             try:
-                # Extraer solo las variables numéricas (asumiendo que las columnas son los elementos químicos)
-                # En producción, deberías definir explícitamente tu lista de 38 'elements'
+                # Extraer solo las variables numéricas
                 datos_numericos = df_input.select_dtypes(include=[np.number])
                 
                 # Preprocesamiento idéntico al entrenamiento (Log10 + StandardScaler)
                 datos_log = np.log10(datos_numericos + 1e-5)
                 datos_escalados = scaler.transform(datos_log)
                 
-                # Predicción del modelo
-                probabilidades = modelo_nn.predict(datos_escalados)
+                # Predicción del modelo Random Forest
+                # predict_proba devuelve dos columnas [prob_esteril, prob_fertil], tomamos la segunda (índice 1)
+                probabilidades = modelo_rf.predict_proba(datos_escalados)[:, 1]
                 
                 # Añadir los resultados al DataFrame original
-                df_input['Probabilidad_Fertilidad'] = probabilidades.flatten()
+                df_input['Probabilidad_Fertilidad'] = probabilidades
                 df_input['Clasificacion_IA'] = np.where(df_input['Probabilidad_Fertilidad'] > 0.5, 'Fértil', 'Estéril/Artefacto')
                 
                 st.success("¡Clasificación completada con éxito!")
@@ -78,4 +79,4 @@ if archivo_subido is not None:
                 )
                 
             except Exception as e:
-                st.error(f"Error de dimensionalidad: Asegúrate de que el archivo contenga los mismos elementos químicos del entrenamiento. Detalles: {e}")
+                st.error(f"Error de procesamiento: Asegúrate de que el archivo contenga los mismos elementos químicos del entrenamiento. Detalles: {e}")
