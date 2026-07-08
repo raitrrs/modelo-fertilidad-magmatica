@@ -5,6 +5,7 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.interpolate import griddata
+pd.set_option("styler.render.max_elements", 100000)
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
