@@ -9,7 +9,7 @@ from scipy.interpolate import griddata
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
 # =====================================================================
-st.set_page_config(page_title="Prospectividad Alausí", layout="wide", page_icon="🌋")
+st.set_page_config(page_title="Fertilidad Geoquímica", layout="wide", page_icon="🌋")
 
 # Configuración de estilo visual para Seaborn
 sns.set_theme(style="whitegrid")
