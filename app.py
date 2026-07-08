@@ -5,7 +5,6 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.interpolate import griddata
-pd.set_option("styler.render.max_elements", 100000)
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -89,12 +88,21 @@ if archivo_subido is not None:
                     
                     st.markdown("---")
                     
-                    # Formato condicional para colorear la tabla
+                    # 💡 SOLUCIÓN: Muestra una muestra representativa con estilo para no saturar el navegador
+                    st.markdown("### 📋 Vista Previa de Muestras (Primeras 500 filas)")
+                    
                     def colorear_fertiles(val):
                         color = '#ffcccc' if val == 'Fértil' else ''
                         return f'background-color: {color}'
                     
-                    st.dataframe(df_input.style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), use_container_width=True)
+                    # Aplicamos el estilo acotado a las primeras 500 muestras (.head) para evitar congelamientos
+                    df_preview = df_input.head(500)
+                    st.dataframe(
+                        df_preview.style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), 
+                        use_container_width=True
+                    )
+                    
+                    st.caption(f"💡 Mostrando una vista previa optimizada de 500 de las {total_muestras} muestras totales. El archivo de descarga contendrá el dataset completo.")
                 
                 # ----- PESTAÑA 2: DIAGRAMAS GEOQUÍMICOS -----
                 with tab2:
