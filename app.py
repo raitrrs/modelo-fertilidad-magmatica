@@ -209,47 +209,56 @@ if archivo_subido is not None:
                     else:
                         st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
 
-                # ----- PESTAÑA 4: ASISTENTE GEMINI -----
+               # ----- PESTAÑA 4: ASISTENTE GEMINI (VISIÓN MULTIMODAL) -----
                 with tab4:
-                    st.subheader("Interpretación Geológica Asistida por IA")
-                    st.write("Esta sección utiliza Gemini para generar un informe técnico interpretando los diagramas multivariados de la Pestaña 2, basándose en la tasa de anomalías actual.")
+                    st.subheader("Interpretación Geológica Asistida por IA (Visión)")
+                    st.write("Esta sección envía los gráficos generados en la Pestaña 2 directamente a Gemini para un análisis visual de las tendencias geoquímicas.")
                     
-                    if st.button("✨ Generar Interpretación de los Gráficos"):
+                    if st.button("✨ Analizar Gráficos con Gemini"):
                         if not api_key_gemini:
                             st.warning("⚠️ Ingresa tu API Key de Gemini en el panel lateral para activar esta función.")
                         else:
                             try:
-                                with st.spinner("Gemini está analizando el contexto geoquímico..."):
-                                    # Configurar el modelo
+                                with st.spinner("Gemini está analizando visualmente los diagramas geoquímicos..."):
+                                    # 1. Convertir la figura de Matplotlib (fig) a una imagen de PIL
+                                    buf = io.BytesIO()
+                                    fig.savefig(buf, format='png', bbox_inches='tight')
+                                    buf.seek(0)
+                                    imagen_pil = Image.open(buf)
+                                    
+                                    # 2. Configurar el modelo (gemini-1.5-flash soporta visión nativamente)
                                     genai.configure(api_key=api_key_gemini)
                                     modelo_ia = genai.GenerativeModel('gemini-1.5-flash')
                                     
-                                    # Calcular porcentaje para dar contexto a la IA
                                     porcentaje_fert = (muestras_fertiles / total_muestras) * 100
                                     
-                                    # Construir el prompt dinámico
+                                    # 3. Construir el prompt para guiar el análisis visual
                                     prompt = f"""
-                                    Actúa como un geoquímico experto en exploración mineral. Acabo de procesar {total_muestras} muestras de roca y mi modelo de Machine Learning determinó que el {porcentaje_fert:.1f}% tienen características de 'Fertilidad Magmática'.
+                                    Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
                                     
-                                    Genera un informe técnico explicando qué nos indican los siguientes 6 diagramas que se generaron para estas muestras. Explica qué significa cada uno específicamente en el contexto de la evolución del magma y la prospectividad mineral:
+                                    Te adjunto una imagen con 6 diagramas geoquímicos generados a partir de estas muestras. Los puntos rojos representan las muestras clasificadas como fértiles y los azules las estériles.
                                     
-                                    1. Sr/Y vs Y (Indicador de profundidad, presión y firmas adakíticas).
-                                    2. Diagrama Spider de Elementos Traza (La, Sr, Y, Zr, Ti, V, Sc, Cu, Zn, Pb - Patrones de enriquecimiento).
-                                    3. Ternario AFM (Na+K, Fe, Mg - Evolución y tendencias calcoalcalinas vs toleíticas).
-                                    4. Fe vs Cr (Fraccionamiento de fases máficas tempranas).
-                                    5. Cu vs K (Asociación con alteración potásica en sistemas porfiríticos).
-                                    6. V vs Ti (Estado de oxidación del magma f/c cristalización de magnetita).
+                                    Por favor, analiza VISUALMENTE la imagen y redacta un informe técnico interpretando lo que observas en los gráficos:
                                     
-                                    Estructura el informe de forma profesional, usando negritas para los nombres de los gráficos y mantén un lenguaje técnico adecuado para un reporte de exploración.
+                                    1. Sr/Y vs Y: ¿Se observa una firma adakítica clara en las muestras fértiles (Sr/Y > 20)?
+                                    2. Diagrama Spider: ¿Qué anomalías (positivas o negativas) y patrones de enriquecimiento destacan entre el promedio fértil vs infértil?
+                                    3. Ternario AFM: ¿Las muestras fértiles siguen una tendencia de diferenciación calcoalcalina clara?
+                                    4. Fe vs Cr & V vs Ti: ¿Qué nos dicen las dispersiones sobre el fraccionamiento temprano y el estado de oxidación del magma?
+                                    5. Cu vs K: ¿Se visualiza alguna correlación que sugiera alteración potásica en los blancos fértiles?
+                                    
+                                    Justifica tus respuestas basándote estrictamente en la distribución de los puntos que ves en la imagen adjunta. Utiliza un lenguaje técnico riguroso adecuado para exploración mineral.
                                     """
                                     
-                                    # Ejecutar la llamada a la API
-                                    respuesta = modelo_ia.generate_content(prompt)
+                                    # 4. Enviar texto e imagen al modelo
+                                    respuesta = modelo_ia.generate_content([prompt, imagen_pil])
                                     
-                                    # Mostrar el resultado
-                                    st.success("✅ Informe generado exitosamente.")
+                                    # Mostrar el resultado y la imagen analizada como referencia
+                                    st.success("✅ Análisis visual completado.")
                                     st.markdown(respuesta.text)
                                     
+                                    with st.expander("Ver imagen analizada por Gemini"):
+                                        st.image(imagen_pil, caption="Gráficos enviados a la IA")
+                                        
                             except Exception as e:
                                 st.error(f"⚠️ Hubo un error al conectar con Gemini: {e}")
                 # =====================================================================
