@@ -1,10 +1,10 @@
-streamlit==1.32.0
+streamlit
 pandas==2.2.1
 numpy
 scikit-learn
+joblib
 matplotlib
 seaborn
 scipy
-joblib
-pydeck
-requests
+Pillow
+google-generativeai
