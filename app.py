@@ -7,7 +7,9 @@ import seaborn as sns
 from scipy.interpolate import griddata
 import json
 import pydeck as pdk
-import google.generativeai as genai
+import io
+from PIL import Image
+from google import genai
 import io
 from PIL import Image
 
@@ -209,7 +211,7 @@ if archivo_subido is not None:
                     else:
                         st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
 
-              # ----- PESTAÑA 4: ASISTENTE GEMINI (VISIÓN MULTIMODAL AUTOMÁTICA) -----
+             # ----- PESTAÑA 4: ASISTENTE GEMINI (VISIÓN MULTIMODAL AUTOMÁTICA) -----
                 with tab4:
                     st.subheader("Interpretación Geológica Asistida por IA (Visión)")
                     st.write("Análisis automatizado de las tendencias geoquímicas mediante visión artificial.")
@@ -219,19 +221,17 @@ if archivo_subido is not None:
                     else:
                         try:
                             with st.spinner("Gemini está analizando visualmente los diagramas geoquímicos... Esto tomará unos segundos."):
-                                # 1. Convertir la figura de Matplotlib (fig) a una imagen de PIL en memoria
+                                # 1. Convertir la figura a imagen PIL
                                 buf = io.BytesIO()
                                 fig.savefig(buf, format='png', bbox_inches='tight')
                                 buf.seek(0)
                                 imagen_pil = Image.open(buf)
                                 
-                                # 2. Configurar el modelo
-                                genai.configure(api_key=api_key_gemini)
-                                modelo_ia = genai.GenerativeModel('gemini-1.5-flash-latest')
+                                # 2. NUEVA CONFIGURACIÓN: Inicializar cliente con el nuevo SDK
+                                client = genai.Client(api_key=api_key_gemini)
                                 
                                 porcentaje_fert = (muestras_fertiles / total_muestras) * 100
                                 
-                                # 3. Construir el prompt para guiar el análisis visual
                                 prompt = f"""
                                 Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
                                 
@@ -248,12 +248,14 @@ if archivo_subido is not None:
                                 Justifica tus respuestas basándote estrictamente en la distribución de los puntos que ves en la imagen adjunta. Utiliza un lenguaje técnico riguroso adecuado para exploración mineral.
                                 """
                                 
-                                # 4. Enviar texto e imagen al modelo
-                                respuesta = modelo_ia.generate_content([prompt, imagen_pil])
+                                # 3. NUEVA SINTAXIS: Generar contenido
+                                response = client.models.generate_content(
+                                    model='gemini-1.5-flash',
+                                    contents=[prompt, imagen_pil]
+                                )
                                 
-                                # Mostrar el resultado y la imagen analizada como referencia
                                 st.success("✅ Análisis visual completado.")
-                                st.markdown(respuesta.text)
+                                st.markdown(response.text)
                                 
                                 with st.expander("Ver imagen enviada a la IA para este análisis"):
                                     st.image(imagen_pil, caption="Gráficos procesados por Gemini")
