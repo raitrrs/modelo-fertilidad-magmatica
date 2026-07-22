@@ -12,6 +12,9 @@ from PIL import Image
 from google import genai
 import io
 from PIL import Image
+import base64
+import requests
+
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -211,65 +214,63 @@ if archivo_subido is not None:
                     else:
                         st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
 
-             import base64
-import requests
-
-# ----- PESTAÑA 4: ASISTENTE MULTIMODAL GRATUITO (HUGGING FACE) -----
-with tab4:
-    st.subheader("Interpretación Geológica Asistida por IA (Visión Gratuita)")
-    st.write("Análisis automatizado de las tendencias geoquímicas mediante modelos Open-Source.")
-    
-    # El usuario introduce su Token Gratuito de Hugging Face
-    hf_token = st.text_input("Ingresa tu Hugging Face Access Token (Gratuito):", type="password")
-    
-    if not hf_token:
-        st.warning("⚠️ Ingresa tu Token de Hugging Face para activar el análisis automático.")
-    else:
-        try:
-            with st.spinner("Procesando gráficos con el modelo multimodal de código abierto..."):
-                # 1. Convertir la figura a Bytes en formato PNG y codificar en Base64
-                buf = io.BytesIO()
-                fig.savefig(buf, format='png', bbox_inches='tight')
-                buf.seek(0)
-                base64_image = base64.b64encode(buf.read()).decode('utf-8')
-                
-                porcentaje_fert = (muestras_fertiles / total_muestras) * 100
-                
-                # 2. Definir el prompt geológico
-                prompt_texto = f"""
-                Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
-                
-                En la imagen adjunta se observan diagramas geoquímicos con puntos rojos (fértiles) y azules (estériles).
-                Analiza los gráficos y redacta un informe técnico interpretando:
-                1. Firma adakítica en Sr/Y vs Y.
-                2. Patrones de enriquecimiento y anomalías en el diagrama Spider.
-                3. Tendencia calcoalcalina en el diagrama AFM.
-                4. Estado de oxidación e implicaciones petrogenéticas.
-                """
-                
-                # 3. Llamada vía API HTTP directamente a Hugging Face (sin errores de librerías locales)
-                API_URL = "https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct"
-                headers = {"Authorization": f"Bearer {hf_token}"}
-                
-                payload = {
-                    "inputs": {
-                        "image": f"data:image/png;base64,{base64_image}",
-                        "prompt": prompt_texto
-                    }
-                }
-                
-                response = requests.post(API_URL, headers=headers, json=payload)
-                resultado = response.json()
-                
-                if response.status_code == 200:
-                    st.success("✅ Análisis completado con éxito.")
-                    # Mostrar la respuesta generada
-                    st.markdown(resultado[0]['generated_text'] if isinstance(resultado, list) else resultado)
-                else:
-                    st.error(f"Error en la API de Hugging Face: {resultado}")
+             
+                # ----- PESTAÑA 4: ASISTENTE MULTIMODAL GRATUITO (HUGGING FACE) -----
+                with tab4:
+                    st.subheader("Interpretación Geológica Asistida por IA (Visión Gratuita)")
+                    st.write("Análisis automatizado de las tendencias geoquímicas mediante modelos Open-Source.")
                     
-        except Exception as e:
-            st.error(f"⚠️ Error al procesar la solicitud: {e}")
+                    # El usuario introduce su Token Gratuito de Hugging Face
+                    hf_token = st.text_input("Ingresa tu Hugging Face Access Token (Gratuito):", type="password")
+                    
+                    if not hf_token:
+                        st.warning("⚠️ Ingresa tu Token de Hugging Face para activar el análisis automático.")
+                    else:
+                        try:
+                            with st.spinner("Procesando gráficos con el modelo multimodal de código abierto..."):
+                                # 1. Convertir la figura a Bytes en formato PNG y codificar en Base64
+                                buf = io.BytesIO()
+                                fig.savefig(buf, format='png', bbox_inches='tight')
+                                buf.seek(0)
+                                base64_image = base64.b64encode(buf.read()).decode('utf-8')
+                                
+                                porcentaje_fert = (muestras_fertiles / total_muestras) * 100
+                                
+                                # 2. Definir el prompt geológico
+                                prompt_texto = f"""
+                                Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
+                                
+                                En la imagen adjunta se observan diagramas geoquímicos con puntos rojos (fértiles) y azules (estériles).
+                                Analiza los gráficos y redacta un informe técnico interpretando:
+                                1. Firma adakítica en Sr/Y vs Y.
+                                2. Patrones de enriquecimiento y anomalías en el diagrama Spider.
+                                3. Tendencia calcoalcalina en el diagrama AFM.
+                                4. Estado de oxidación e implicaciones petrogenéticas.
+                                """
+                                
+                                # 3. Llamada vía API HTTP directamente a Hugging Face (sin errores de librerías locales)
+                                API_URL = "https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct"
+                                headers = {"Authorization": f"Bearer {hf_token}"}
+                                
+                                payload = {
+                                    "inputs": {
+                                        "image": f"data:image/png;base64,{base64_image}",
+                                        "prompt": prompt_texto
+                                    }
+                                }
+                                
+                                response = requests.post(API_URL, headers=headers, json=payload)
+                                resultado = response.json()
+                                
+                                if response.status_code == 200:
+                                    st.success("✅ Análisis completado con éxito.")
+                                    # Mostrar la respuesta generada
+                                    st.markdown(resultado[0]['generated_text'] if isinstance(resultado, list) else resultado)
+                                else:
+                                    st.error(f"Error en la API de Hugging Face: {resultado}")
+                                    
+                        except Exception as e:
+                            st.error(f"⚠️ Error al procesar la solicitud: {e}")
                 # =====================================================================
                 # PREPARACIÓN DE DESCARGAS (CSV Y GEOJSON)
                 # =====================================================================
