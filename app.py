@@ -211,57 +211,65 @@ if archivo_subido is not None:
                     else:
                         st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
 
-             # ----- PESTAÑA 4: ASISTENTE GEMINI (VISIÓN MULTIMODAL AUTOMÁTICA) -----
-                with tab4:
-                    st.subheader("Interpretación Geológica Asistida por IA (Visión)")
-                    st.write("Análisis automatizado de las tendencias geoquímicas mediante visión artificial.")
+             import base64
+import requests
+
+# ----- PESTAÑA 4: ASISTENTE MULTIMODAL GRATUITO (HUGGING FACE) -----
+with tab4:
+    st.subheader("Interpretación Geológica Asistida por IA (Visión Gratuita)")
+    st.write("Análisis automatizado de las tendencias geoquímicas mediante modelos Open-Source.")
+    
+    # El usuario introduce su Token Gratuito de Hugging Face
+    hf_token = st.text_input("Ingresa tu Hugging Face Access Token (Gratuito):", type="password")
+    
+    if not hf_token:
+        st.warning("⚠️ Ingresa tu Token de Hugging Face para activar el análisis automático.")
+    else:
+        try:
+            with st.spinner("Procesando gráficos con el modelo multimodal de código abierto..."):
+                # 1. Convertir la figura a Bytes en formato PNG y codificar en Base64
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', bbox_inches='tight')
+                buf.seek(0)
+                base64_image = base64.b64encode(buf.read()).decode('utf-8')
+                
+                porcentaje_fert = (muestras_fertiles / total_muestras) * 100
+                
+                # 2. Definir el prompt geológico
+                prompt_texto = f"""
+                Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
+                
+                En la imagen adjunta se observan diagramas geoquímicos con puntos rojos (fértiles) y azules (estériles).
+                Analiza los gráficos y redacta un informe técnico interpretando:
+                1. Firma adakítica en Sr/Y vs Y.
+                2. Patrones de enriquecimiento y anomalías en el diagrama Spider.
+                3. Tendencia calcoalcalina en el diagrama AFM.
+                4. Estado de oxidación e implicaciones petrogenéticas.
+                """
+                
+                # 3. Llamada vía API HTTP directamente a Hugging Face (sin errores de librerías locales)
+                API_URL = "https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct"
+                headers = {"Authorization": f"Bearer {hf_token}"}
+                
+                payload = {
+                    "inputs": {
+                        "image": f"data:image/png;base64,{base64_image}",
+                        "prompt": prompt_texto
+                    }
+                }
+                
+                response = requests.post(API_URL, headers=headers, json=payload)
+                resultado = response.json()
+                
+                if response.status_code == 200:
+                    st.success("✅ Análisis completado con éxito.")
+                    # Mostrar la respuesta generada
+                    st.markdown(resultado[0]['generated_text'] if isinstance(resultado, list) else resultado)
+                else:
+                    st.error(f"Error en la API de Hugging Face: {resultado}")
                     
-                    if not api_key_gemini:
-                        st.warning("⚠️ Ingresa tu API Key de Gemini en el panel lateral para activar el análisis automático.")
-                    else:
-                        try:
-                            with st.spinner("Gemini está analizando visualmente los diagramas geoquímicos... Esto tomará unos segundos."):
-                                # 1. Convertir la figura a imagen PIL
-                                buf = io.BytesIO()
-                                fig.savefig(buf, format='png', bbox_inches='tight')
-                                buf.seek(0)
-                                imagen_pil = Image.open(buf)
-                                
-                                # 2. NUEVA CONFIGURACIÓN: Inicializar cliente con el nuevo SDK
-                                client = genai.Client(api_key=api_key_gemini)
-                                
-                                porcentaje_fert = (muestras_fertiles / total_muestras) * 100
-                                
-                                prompt = f"""
-                                Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
-                                
-                                Te adjunto una imagen con 6 diagramas geoquímicos generados a partir de estas muestras. Los puntos rojos representan las muestras clasificadas como fértiles y los azules las estériles.
-                                
-                                Por favor, analiza VISUALMENTE la imagen y redacta un informe técnico interpretando lo que observas en los gráficos:
-                                
-                                1. Sr/Y vs Y: ¿Se observa una firma adakítica clara en las muestras fértiles (Sr/Y > 20)?
-                                2. Diagrama Spider: ¿Qué anomalías (positivas o negativas) y patrones de enriquecimiento destacan entre el promedio fértil vs infértil?
-                                3. Ternario AFM: ¿Las muestras fértiles siguen una tendencia de diferenciación calcoalcalina clara?
-                                4. Fe vs Cr & V vs Ti: ¿Qué nos dicen las dispersiones sobre el fraccionamiento temprano y el estado de oxidación del magma?
-                                5. Cu vs K: ¿Se visualiza alguna correlación que sugiera alteración potásica en los blancos fértiles?
-                                
-                                Justifica tus respuestas basándote estrictamente en la distribución de los puntos que ves en la imagen adjunta. Utiliza un lenguaje técnico riguroso adecuado para exploración mineral.
-                                """
-                                
-                                # 3. NUEVA SINTAXIS: Generar contenido
-                                response = client.models.generate_content(
-                                    model='gemini-1.5-flash-002', # <-- Añadimos el -001
-                                    contents=[prompt, imagen_pil]
-                                )
-                                
-                                st.success("✅ Análisis visual completado.")
-                                st.markdown(response.text)
-                                
-                                with st.expander("Ver imagen enviada a la IA para este análisis"):
-                                    st.image(imagen_pil, caption="Gráficos procesados por Gemini")
-                                    
-                        except Exception as e:
-                            st.error(f"⚠️ Hubo un error al conectar con Gemini: {e}")
+        except Exception as e:
+            st.error(f"⚠️ Error al procesar la solicitud: {e}")
                 # =====================================================================
                 # PREPARACIÓN DE DESCARGAS (CSV Y GEOJSON)
                 # =====================================================================
