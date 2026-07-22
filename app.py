@@ -250,9 +250,9 @@ if archivo_subido is not None:
                                 
                                 # 3. NUEVA SINTAXIS: Generar contenido
                                response = client.models.generate_content(
-                                    model='gemini-1.5-flash-001', # <-- Añadimos el -001
-                                    contents=[prompt, imagen_pil]
-                                    )
+    model='gemini-1.5-flash-001', # <-- Añadimos el -001
+    contents=[prompt, imagen_pil]
+)
                                 
                                 st.success("✅ Análisis visual completado.")
                                 st.markdown(response.text)
