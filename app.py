@@ -5,13 +5,13 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.interpolate import griddata
+import json
+import pydeck as pdk
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
 # =====================================================================
 st.set_page_config(page_title="Fertilidad Geoquímica", layout="wide", page_icon="🌋")
-
-# Configuración de estilo visual para Seaborn
 sns.set_theme(style="whitegrid")
 
 st.title("Clasificador de Fertilidad Magmática")
@@ -29,7 +29,6 @@ def cargar_modelos():
 
 scaler, modelo_rf = cargar_modelos()
 
-# Lista estricta de elementos requeridos
 elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'BI',
                         'FE', 'MN', 'TE', 'BA', 'CR', 'V', 'SN', 'W', 'LA', 'AL',
                         'MG', 'CA', 'NA', 'K', 'SR', 'Y', 'GA', 'LI', 'NB', 'SC',
@@ -41,6 +40,11 @@ elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'B
 st.sidebar.header("⚙️ Panel de Control")
 st.sidebar.write("Sube la matriz analítica del laboratorio.")
 archivo_subido = st.sidebar.file_uploader("Formato CSV o Excel", type=['csv', 'xlsx'])
+
+st.sidebar.markdown("---")
+st.sidebar.header("🎛️ Parámetros del Modelo")
+# UMBRAL DINÁMICO
+umbral_corte = st.sidebar.slider("Umbral de Probabilidad (Corte Fértil)", 0.0, 1.0, 0.5, 0.05)
 
 # =====================================================================
 # ÁREA PRINCIPAL
@@ -63,16 +67,17 @@ if archivo_subido is not None:
                 probabilidades = modelo_rf.predict_proba(datos_escalados)[:, 1]
                 
                 df_input['Prob_Fertilidad'] = probabilidades
-                df_input['Clasificacion_IA'] = np.where(df_input['Prob_Fertilidad'] > 0.5, 'Fértil', 'Estéril/Artefacto')
                 
-                # Calcular Sr/Y para los gráficos
+                # APLICANDO EL UMBRAL DINÁMICO
+                df_input['Clasificacion_IA'] = np.where(df_input['Prob_Fertilidad'] >= umbral_corte, 'Fértil', 'Estéril/Artefacto')
+                
                 if 'SR' in df_input.columns and 'Y' in df_input.columns:
                     df_input['Sr_Y'] = df_input['SR'] / df_input['Y']
                 
                 # =====================================================================
-                # CREACIÓN DE PESTAÑAS (TABS) PARA ORGANIZAR LA VISTA
+                # CREACIÓN DE PESTAÑAS (TABS)
                 # =====================================================================
-                tab1, tab2, tab3 = st.tabs(["📄 Resumen y Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa de Calor Espacial"])
+                tab1, tab2, tab3 = st.tabs(["📄 Resumen y Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa 3D Espacial"])
                 
                 # ----- PESTAÑA 1: DATOS Y KPIS -----
                 with tab1:
@@ -82,27 +87,21 @@ if archivo_subido is not None:
                     porcentaje_anomalias = (muestras_fertiles / total_muestras) * 100
                     
                     col1, col2, col3 = st.columns(3)
-                    col1.metric("Total Muestras Analizadas", total_muestras)
+                    col1.metric("Total Muestras", total_muestras)
                     col2.metric("Blancos Fértiles Detectados", muestras_fertiles)
                     col3.metric("Tasa de Anomalía", f"{porcentaje_anomalias:.2f}%")
                     
                     st.markdown("---")
-                    
-                    # 💡 SOLUCIÓN: Muestra una muestra representativa con estilo para no saturar el navegador
                     st.markdown("### 📋 Vista Previa de Muestras (Primeras 500 filas)")
                     
                     def colorear_fertiles(val):
                         color = '#ffcccc' if val == 'Fértil' else ''
                         return f'background-color: {color}'
                     
-                    # Aplicamos el estilo acotado a las primeras 500 muestras (.head) para evitar congelamientos
-                    df_preview = df_input.head(500)
                     st.dataframe(
-                        df_preview.style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), 
+                        df_input.head(500).style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), 
                         use_container_width=True
                     )
-                    
-                    st.caption(f"💡 Mostrando una vista previa optimizada de 500 de las {total_muestras} muestras totales. El archivo de descarga contendrá el dataset completo.")
                 
                 # ----- PESTAÑA 2: DIAGRAMAS GEOQUÍMICOS -----
                 with tab2:
@@ -135,7 +134,7 @@ if archivo_subido is not None:
                     Total = A + F + M + 1e-5
                     X_tern = (M/Total) + (F/Total) / 2.0
                     Y_tern = (F/Total) * np.sqrt(3) / 2.0
-                    sc = ax3.scatter(X_tern, Y_tern, c=df_input['Prob_Fertilidad'], cmap=cmap_prob, s=20, alpha=0.7)
+                    ax3.scatter(X_tern, Y_tern, c=df_input['Prob_Fertilidad'], cmap=cmap_prob, s=20, alpha=0.7)
                     ax3.plot([0, 1, 0.5, 0], [0, 0, np.sqrt(3)/2, 0], 'k-', lw=1.5)
                     ax3.text(-0.05, -0.05, 'Na+K', ha='center')
                     ax3.text(1.05, -0.05, 'Mg', ha='center')
@@ -170,37 +169,71 @@ if archivo_subido is not None:
                     plt.tight_layout()
                     st.pyplot(fig)
                 
-                # ----- PESTAÑA 3: MAPA ESPACIAL -----
+                # ----- PESTAÑA 3: MAPA ESPACIAL INTERACTIVO (PYDECK) -----
                 with tab3:
-                    st.subheader("Modelamiento Espacial de Prospectividad")
+                    st.subheader("Modelamiento Espacial Interactivo 3D")
                     if 'LONGITUD' in df_input.columns and 'LATITUD' in df_input.columns:
-                        X_coord = df_input['LONGITUD'].values
-                        Y_coord = df_input['LATITUD'].values
-                        Z_prob = df_input['Prob_Fertilidad'].values
                         
-                        grid_x, grid_y = np.mgrid[X_coord.min():X_coord.max():200j, Y_coord.min():Y_coord.max():200j]
-                        grid_z = griddata((X_coord, Y_coord), Z_prob, (grid_x, grid_y), method='linear')
+                        df_input['Color_Punto'] = df_input['Clasificacion_IA'].apply(
+                            lambda x: [200, 30, 30, 200] if x == 'Fértil' else [30, 130, 200, 150]
+                        )
                         
-                        fig_map = plt.figure(figsize=(10, 8))
-                        mapa_calor = plt.imshow(grid_z.T, extent=(X_coord.min(), X_coord.max(), Y_coord.min(), Y_coord.max()),
-                                                origin='lower', cmap='coolwarm', alpha=0.85)
+                        capa_puntos = pdk.Layer(
+                            "ScatterplotLayer",
+                            df_input,
+                            get_position=['LONGITUD', 'LATITUD'],
+                            get_color='Color_Punto',
+                            get_radius="Prob_Fertilidad * 1500", 
+                            pickable=True
+                        )
                         
-                        contornos = plt.contour(grid_x, grid_y, grid_z, levels=[0.5, 0.7, 0.9], colors=['yellow', 'orange', 'darkred'], linewidths=1.5, linestyles='--')
-                        plt.clabel(contornos, inline=True, fontsize=10, fmt='Prob: %.1f')
+                        vista_inicial = pdk.ViewState(
+                            latitude=df_input['LATITUD'].mean(),
+                            longitude=df_input['LONGITUD'].mean(),
+                            zoom=6,
+                            pitch=45 
+                        )
                         
-                        plt.title('Mapa de Calor: Certeza de Fertilidad Magmática')
-                        plt.xlabel('Longitud')
-                        plt.ylabel('Latitud')
-                        cbar = plt.colorbar(mapa_calor, shrink=0.8)
-                        cbar.set_label('Índice de Certeza')
-                        st.pyplot(fig_map)
+                        st.pydeck_chart(pdk.Deck(
+                            map_style='mapbox://styles/mapbox/outdoors-v11',
+                            initial_view_state=vista_inicial,
+                            layers=[capa_puntos],
+                            tooltip={"text": "Probabilidad: {Prob_Fertilidad}\nClase: {Clasificacion_IA}"}
+                        ))
+                        st.caption("Usa clic derecho + arrastrar para rotar el mapa en 3D.")
                     else:
-                        st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
-                
-                # Preparar descarga
-                csv_buffer = df_input.to_csv(index=False).encode('utf-8')
+                        st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa.")
+
+                # =====================================================================
+                # PREPARACIÓN DE DESCARGAS (CSV Y GEOJSON)
+                # =====================================================================
                 st.sidebar.markdown("---")
-                st.sidebar.download_button("📥 Descargar Resultados", data=csv_buffer, file_name="Resultados_Predictivos.csv", mime="text/csv")
+                
+                # 1. Descarga CSV
+                csv_buffer = df_input.drop(columns=['Color_Punto'], errors='ignore').to_csv(index=False).encode('utf-8')
+                st.sidebar.download_button("📥 Descargar Tabla CSV", data=csv_buffer, file_name="Resultados_Predictivos.csv", mime="text/csv")
+                
+                # 2. Descarga GeoJSON para SIG
+                if 'LONGITUD' in df_input.columns and 'LATITUD' in df_input.columns:
+                    features = []
+                    for _, row in df_input.iterrows():
+                        features.append({
+                            "type": "Feature",
+                            "geometry": {"type": "Point", "coordinates": [row['LONGITUD'], row['LATITUD']]},
+                            "properties": {
+                                "Prob_Fertilidad": round(row['Prob_Fertilidad'], 4),
+                                "Clasificacion_IA": row['Clasificacion_IA']
+                            }
+                        })
+                    geojson_data = {"type": "FeatureCollection", "features": features}
+                    geojson_buffer = json.dumps(geojson_data).encode('utf-8')
+                    
+                    st.sidebar.download_button(
+                        "🗺️ Descargar Capa GeoJSON (Para SIG)", 
+                        data=geojson_buffer, 
+                        file_name="Anomalias_Espaciales.geojson", 
+                        mime="application/geo+json"
+                    )
                 
             except KeyError as e:
                 st.error(f"⚠️ Error: Falta la columna {e} en el archivo. Se requieren 38 elementos químicos.")
