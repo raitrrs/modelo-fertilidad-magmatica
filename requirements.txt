@@ -1,9 +1,9 @@
 streamlit
 pandas
-numpy<2.0.0
+numpy
 scikit-learn
-openpyxl
 matplotlib
 seaborn
 scipy
+joblib
 google-generativeai
