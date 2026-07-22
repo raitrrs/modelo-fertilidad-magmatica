@@ -169,40 +169,50 @@ if archivo_subido is not None:
                     plt.tight_layout()
                     st.pyplot(fig)
                 
-                # ----- PESTAÑA 3: MAPA ESPACIAL INTERACTIVO (PYDECK) -----
+               # ----- PESTAÑA 3: MAPA ESPACIAL INTERACTIVO (PYDECK) -----
                 with tab3:
                     st.subheader("Modelamiento Espacial Interactivo 3D")
                     if 'LONGITUD' in df_input.columns and 'LATITUD' in df_input.columns:
                         
-                        df_input['Color_Punto'] = df_input['Clasificacion_IA'].apply(
-                            lambda x: [200, 30, 30, 200] if x == 'Fértil' else [30, 130, 200, 150]
-                        )
+                        # 1. LIMPIEZA ESTRICTA: PyDeck falla en silencio si hay nulos o texto en coordenadas
+                        df_mapa = df_input.dropna(subset=['LATITUD', 'LONGITUD']).copy()
+                        df_mapa['LATITUD'] = pd.to_numeric(df_mapa['LATITUD'], errors='coerce')
+                        df_mapa['LONGITUD'] = pd.to_numeric(df_mapa['LONGITUD'], errors='coerce')
+                        df_mapa = df_mapa.dropna(subset=['LATITUD', 'LONGITUD'])
                         
-                        capa_puntos = pdk.Layer(
-                            "ScatterplotLayer",
-                            df_input,
-                            get_position=['LONGITUD', 'LATITUD'],
-                            get_color='Color_Punto',
-                            get_radius="Prob_Fertilidad * 1500", 
-                            pickable=True
-                        )
-                        
-                        vista_inicial = pdk.ViewState(
-                            latitude=df_input['LATITUD'].mean(),
-                            longitude=df_input['LONGITUD'].mean(),
-                            zoom=6,
-                            pitch=45 
-                        )
-                        
-                        st.pydeck_chart(pdk.Deck(
-                            map_style='mapbox://styles/mapbox/outdoors-v11',
-                            initial_view_state=vista_inicial,
-                            layers=[capa_puntos],
-                            tooltip={"text": "Probabilidad: {Prob_Fertilidad}\nClase: {Clasificacion_IA}"}
-                        ))
-                        st.caption("Usa clic derecho + arrastrar para rotar el mapa en 3D.")
+                        if len(df_mapa) > 0:
+                            df_mapa['Color_Punto'] = df_mapa['Clasificacion_IA'].apply(
+                                lambda x: [200, 30, 30, 200] if x == 'Fértil' else [30, 130, 200, 150]
+                            )
+                            
+                            capa_puntos = pdk.Layer(
+                                "ScatterplotLayer",
+                                df_mapa,
+                                get_position=['LONGITUD', 'LATITUD'],
+                                get_color='Color_Punto',
+                                get_radius="Prob_Fertilidad * 1500", 
+                                pickable=True
+                            )
+                            
+                            vista_inicial = pdk.ViewState(
+                                latitude=df_mapa['LATITUD'].mean(),
+                                longitude=df_mapa['LONGITUD'].mean(),
+                                zoom=6,
+                                pitch=45 
+                            )
+                            
+                            # 2. ESTILO SEGURO: Eliminamos mapbox:// para usar el mapa base por defecto (Carto)
+                            st.pydeck_chart(pdk.Deck(
+                                map_style=None, 
+                                initial_view_state=vista_inicial,
+                                layers=[capa_puntos],
+                                tooltip={"text": "Probabilidad: {Prob_Fertilidad}\nClase: {Clasificacion_IA}"}
+                            ))
+                            st.caption("Usa clic derecho + arrastrar para rotar el mapa en 3D.")
+                        else:
+                            st.error("⚠️ No hay coordenadas válidas (numéricas) para graficar en el mapa.")
                     else:
-                        st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa.")
+                        st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'.")
 
                 # =====================================================================
                 # PREPARACIÓN DE DESCARGAS (CSV Y GEOJSON)
