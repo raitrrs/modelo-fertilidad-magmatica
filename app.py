@@ -6,19 +6,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.interpolate import griddata
 
-# Nuevas importaciones para el chatbot de imágenes
-import io
-import os
-import base64
-import requests  # se usa en la plantilla HTTP. Asegúrate de tener requests instalado.
-
-# Opcional: si usas el cliente oficial de Google Generative API (si está disponible)
-try:
-    import google.generativeai as genai  # opcional, solo si usas este SDK
-    HAS_GENAI = True
-except Exception:
-    HAS_GENAI = False
-
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
 # =====================================================================
@@ -47,75 +34,6 @@ elementos_requeridos = ['AU', 'AG', 'CU', 'PB', 'ZN', 'MO', 'NI', 'CO', 'CD', 'B
                         'FE', 'MN', 'TE', 'BA', 'CR', 'V', 'SN', 'W', 'LA', 'AL',
                         'MG', 'CA', 'NA', 'K', 'SR', 'Y', 'GA', 'LI', 'NB', 'SC',
                         'TA', 'TI', 'ZR', 'AS', 'SB', 'HG', 'PT', 'PD']
-
-# =====================================================================
-# FUNCIONES AUXILIARES PARA DESCRIPCIÓN DE IMÁGENES (GEMINI)
-# =====================================================================
-
-def fig_to_bytes(fig):
-    """Convierte una figura matplotlib a bytes PNG en memoria."""
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=150)
-    buf.seek(0)
-    return buf.getvalue()
-
-def describe_with_gemini_http(image_bytes: bytes, prompt: str, api_key: str, model: str = "gemini-image-placeholder"):
-    """
-    Plantilla: realiza una petición HTTP a tu endpoint Gemini.
-    - Reemplaza `url` y la estructura de `payload` según la API que uses (Vertex AI, PaLM REST, etc.).
-    - api_key: pone tu clave en la cabecera Authorization: Bearer <KEY> o según tu método.
-    """
-    # --- EJEMPLO GENÉRICO (REEMPLAZAR) ---
-    # Nota: Esta URL y payload son de ejemplo/placeholder. Cámbialos por el endpoint correcto.
-    url = "https://GENERATIVE_API_ENDPOINT/v1/models/{model}:predict".format(model=model)
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        # si la API requiere otro content-type, actualizarlo
-    }
-    # Si la API acepta archivos multipart:
-    files = {
-        "image": ("plot.png", image_bytes, "image/png")
-    }
-    data = {
-        "prompt": prompt,
-        # otros parámetros que tu endpoint requiera
-    }
-    try:
-        resp = requests.post(url, headers=headers, files=files, data=data, timeout=60)
-        resp.raise_for_status()
-        return resp.json()  # adapta según la estructura real de la respuesta
-    except Exception as e:
-        return {"error": str(e)}
-
-def describe_with_genai_sdk(image_bytes: bytes, prompt: str, model: str = "gemini-image-alpha-1"):
-    """
-    Ejemplo usando `google.generativeai` si lo tienes configurado.
-    - Necesitas: export GEMINI_API_KEY=tu_api_key
-    - Este bloque es un ejemplo; adapta según la versión del SDK que estés usando.
-    """
-    if not HAS_GENAI:
-        return {"error": "google.generativeai no está instalado"}
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return {"error": "No se encontró GEMINI_API_KEY en variables de entorno"}
-    genai.configure(api_key=api_key)
-    # El uso exacto del SDK para multimodal puede variar. Este es un esqueleto ilustrativo.
-    try:
-        # Convertir a base64 (sólo si el SDK necesita la imagen inline)
-        img_b64 = base64.b64encode(image_bytes).decode("utf-8")
-        # Ejemplo hipotético de llamada multimodal tipo chat (adaptar a tu SDK)
-        response = genai.chat.create(
-            model=model,
-            messages=[
-                {"role": "user", "content": prompt},
-                # Algunos SDKs permiten anexar image data en una estructura separada
-            ],
-            # Si el SDK soporta adjuntar la imagen en la petición, úsalo:
-            # media=[{"type":"image", "data": img_b64}]
-        )
-        return response  # adapta según respuesta real
-    except Exception as e:
-        return {"error": str(e)}
 
 # =====================================================================
 # PANEL LATERAL (SIDEBAR)
@@ -170,12 +88,14 @@ if archivo_subido is not None:
                     
                     st.markdown("---")
                     
+                    # 💡 SOLUCIÓN: Muestra una muestra representativa con estilo para no saturar el navegador
                     st.markdown("### 📋 Vista Previa de Muestras (Primeras 500 filas)")
                     
                     def colorear_fertiles(val):
                         color = '#ffcccc' if val == 'Fértil' else ''
                         return f'background-color: {color}'
                     
+                    # Aplicamos el estilo acotado a las primeras 500 muestras (.head) para evitar congelamientos
                     df_preview = df_input.head(500)
                     st.dataframe(
                         df_preview.style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), 
@@ -248,42 +168,8 @@ if archivo_subido is not None:
                     ax6.legend([],[], frameon=False)
 
                     plt.tight_layout()
-                    # Mostrar figura en Streamlit
                     st.pyplot(fig)
-
-                    # --- INTEGRACIÓN DEL CHATBOT GEMINI ---
-                    st.markdown("---")
-                    st.markdown("### 🤖 Describir figura con Gemini")
-                    st.markdown("Haz clic para generar una descripción automática de la figura (usa tu cuenta/endpoint de Gemini).")
-
-                    # Botón para generar la descripción
-                    if st.button("📝 Describir figura (Gemini)"):
-                        with st.spinner("Enviando imagen a Gemini y esperando respuesta..."):
-                            # Convertir figura a bytes
-                            image_bytes = fig_to_bytes(fig)
-
-                            # Prompt que vas a enviar al modelo (modifica según quieras)
-                            prompt = (
-                                "En español: Describe la figura adjunta. "
-                                "Indica patrones relevantes, anomalías, diferencias entre muestras fértiles e infértiles, "
-                                "y una interpretación geológica corta (3-5 puntos). Usa un tono técnico pero claro."
-                            )
-
-                            # Opción 1: usar SDK google.generativeai (si está instalado y configurado)
-                            if HAS_GENAI and os.environ.get("GEMINI_API_KEY"):
-                                result = describe_with_genai_sdk(image_bytes, prompt, model="gemini-image-alpha-1")
-                                st.write("Respuesta (SDK):")
-                                st.write(result)
-                            else:
-                                # Opción 2: usar petición HTTP genérica (rellena tu endpoint y API key en variable de entorno)
-                                api_key = os.environ.get("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY") if hasattr(st, 'secrets') else None
-                                if not api_key:
-                                    st.error("No se encontró la variable de entorno GEMINI_API_KEY. Define tu clave de API en GEMINI_API_KEY.")
-                                else:
-                                    resp = describe_with_gemini_http(image_bytes, prompt, api_key, model="gemini-image-placeholder")
-                                    st.write("Respuesta (HTTP):")
-                                    st.json(resp)
-
+                
                 # ----- PESTAÑA 3: MAPA ESPACIAL -----
                 with tab3:
                     st.subheader("Modelamiento Espacial de Prospectividad")
