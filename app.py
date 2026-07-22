@@ -6,14 +6,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.interpolate import griddata
 import json
-import pydeck as pdk
 import io
 from PIL import Image
-import io
-from PIL import Image
-import base64
-import requests
-
+import google.generativeai as genai
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -54,7 +49,7 @@ st.sidebar.header("🎛️ Parámetros del Modelo")
 umbral_corte = st.sidebar.slider("Umbral de Probabilidad (Corte Fértil)", 0.0, 1.0, 0.5, 0.05)
 st.sidebar.markdown("---")
 st.sidebar.header("🤖 Integración con IA")
-
+api_key_gemini = st.sidebar.text_input("🔑 API Key de Google Gemini", type="password", help="Obtén tu clave gratuita en Google AI Studio")
 
 # =====================================================================
 # ÁREA PRINCIPAL
@@ -179,12 +174,11 @@ if archivo_subido is not None:
                     plt.tight_layout()
                     st.pyplot(fig)
                 
-               # ----- PESTAÑA 3: MAPA ESPACIAL (ORIGINAL) -----
+               # ----- PESTAÑA 3: MAPA ESPACIAL -----
                 with tab3:
                     st.subheader("Modelamiento Espacial de Prospectividad")
                     if 'LONGITUD' in df_input.columns and 'LATITUD' in df_input.columns:
                         
-                        # Limpieza de nulos por seguridad antes de interpolar
                         df_mapa = df_input.dropna(subset=['LATITUD', 'LONGITUD'])
                         
                         if len(df_mapa) > 0:
@@ -214,28 +208,29 @@ if archivo_subido is not None:
                         st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
 
              
-                # ----- PESTAÑA 4: ASISTENTE MULTIMODAL GRATUITO (HUGGING FACE) -----
+                # ----- PESTAÑA 4: ASISTENTE MULTIMODAL GEMINI -----
                 with tab4:
-                    st.subheader("Interpretación Geológica Asistida por IA (Visión Gratuita)")
-                    st.write("Análisis automatizado de las tendencias geoquímicas mediante modelos Open-Source.")
+                    st.subheader("Interpretación Geológica Asistida por IA (Google Gemini)")
+                    st.write("Análisis automatizado de las tendencias geoquímicas mediante visión computacional.")
                     
-                    # El usuario introduce su Token Gratuito de Hugging Face
-                    hf_token = st.text_input("Ingresa tu Hugging Face Access Token (Gratuito):", type="password")
-                    
-                    if not hf_token:
-                        st.warning("⚠️ Ingresa tu Token de Hugging Face para activar el análisis automático.")
+                    if not api_key_gemini:
+                        st.warning("⚠️ Ingresa tu API Key de Google Gemini en el panel lateral para activar el análisis automático.")
                     else:
                         try:
-                            with st.spinner("Procesando gráficos con el modelo multimodal de código abierto..."):
-                                # 1. Convertir la figura a Bytes en formato PNG y codificar en Base64
+                            with st.spinner("Procesando gráficos con Gemini 1.5 Flash..."):
+                                # 1. Configurar la API de Gemini
+                                genai.configure(api_key=api_key_gemini)
+                                model = genai.GenerativeModel('gemini-1.5-flash')
+                                
+                                # 2. Convertir la figura de matplotlib a un objeto PIL Image en memoria
                                 buf = io.BytesIO()
                                 fig.savefig(buf, format='png', bbox_inches='tight')
                                 buf.seek(0)
-                                base64_image = base64.b64encode(buf.read()).decode('utf-8')
+                                image_pil = Image.open(buf)
                                 
                                 porcentaje_fert = (muestras_fertiles / total_muestras) * 100
                                 
-                                # 2. Definir el prompt geológico
+                                # 3. Definir el prompt geológico
                                 prompt_texto = f"""
                                 Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
                                 
@@ -247,29 +242,15 @@ if archivo_subido is not None:
                                 4. Estado de oxidación e implicaciones petrogenéticas.
                                 """
                                 
-                                # 3. Llamada vía API HTTP directamente a Hugging Face (sin errores de librerías locales)
-                                API_URL = "https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct"
-                                headers = {"Authorization": f"Bearer {hf_token}"}
+                                # 4. Llamada a la API de Gemini enviando texto e imagen simultáneamente
+                                response = model.generate_content([prompt_texto, image_pil])
                                 
-                                payload = {
-                                    "inputs": {
-                                        "image": f"data:image/png;base64,{base64_image}",
-                                        "prompt": prompt_texto
-                                    }
-                                }
-                                
-                                response = requests.post(API_URL, headers=headers, json=payload)
-                                resultado = response.json()
-                                
-                                if response.status_code == 200:
-                                    st.success("✅ Análisis completado con éxito.")
-                                    # Mostrar la respuesta generada
-                                    st.markdown(resultado[0]['generated_text'] if isinstance(resultado, list) else resultado)
-                                else:
-                                    st.error(f"Error en la API de Hugging Face: {resultado}")
+                                st.success("✅ Análisis completado con éxito.")
+                                st.markdown(response.text)
                                     
                         except Exception as e:
-                            st.error(f"⚠️ Error al procesar la solicitud: {e}")
+                            st.error(f"⚠️ Error al procesar la solicitud con Gemini: {e}")
+                
                 # =====================================================================
                 # PREPARACIÓN DE DESCARGAS (CSV Y GEOJSON)
                 # =====================================================================
