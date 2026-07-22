@@ -6,9 +6,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.interpolate import griddata
 import json
-import io
-from PIL import Image
-import google.generativeai as genai
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -47,9 +44,6 @@ st.sidebar.markdown("---")
 st.sidebar.header("🎛️ Parámetros del Modelo")
 # UMBRAL DINÁMICO
 umbral_corte = st.sidebar.slider("Umbral de Probabilidad (Corte Fértil)", 0.0, 1.0, 0.5, 0.05)
-st.sidebar.markdown("---")
-st.sidebar.header("🤖 Integración con IA")
-api_key_gemini = st.sidebar.text_input("🔑 API Key de Google Gemini", type="password", help="Obtén tu clave gratuita en Google AI Studio")
 
 # =====================================================================
 # ÁREA PRINCIPAL
@@ -82,7 +76,7 @@ if archivo_subido is not None:
                 # =====================================================================
                 # CREACIÓN DE PESTAÑAS (TABS)
                 # =====================================================================
-                tab1, tab2, tab3, tab4 = st.tabs(["📄 Resumen y Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa Espacial", "🤖 Asistente Gemini"])
+                tab1, tab2, tab3 = st.tabs(["📄 Resumen y Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa Espacial"])
                 
                 # ----- PESTAÑA 1: DATOS Y KPIS -----
                 with tab1:
@@ -207,50 +201,6 @@ if archivo_subido is not None:
                     else:
                         st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
 
-             
-                # ----- PESTAÑA 4: ASISTENTE MULTIMODAL GEMINI -----
-                with tab4:
-                    st.subheader("Interpretación Geológica Asistida por IA (Google Gemini)")
-                    st.write("Análisis automatizado de las tendencias geoquímicas mediante visión computacional.")
-                    
-                    if not api_key_gemini:
-                        st.warning("⚠️ Ingresa tu API Key de Google Gemini en el panel lateral para activar el análisis automático.")
-                    else:
-                        try:
-                            with st.spinner("Procesando gráficos con Gemini 1.5 Flash..."):
-                                # 1. Configurar la API de Gemini
-                                genai.configure(api_key=api_key_gemini)
-                                model = genai.GenerativeModel('gemini-1.5-flash')
-                                
-                                # 2. Convertir la figura de matplotlib a un objeto PIL Image en memoria
-                                buf = io.BytesIO()
-                                fig.savefig(buf, format='png', bbox_inches='tight')
-                                buf.seek(0)
-                                image_pil = Image.open(buf)
-                                
-                                porcentaje_fert = (muestras_fertiles / total_muestras) * 100
-                                
-                                # 3. Definir el prompt geológico
-                                prompt_texto = f"""
-                                Actúa como un geoquímico experto. Acabo de procesar {total_muestras} muestras de roca y mi modelo predictivo determinó que el {porcentaje_fert:.1f}% tienen firmas de fertilidad magmática.
-                                
-                                En la imagen adjunta se observan diagramas geoquímicos con puntos rojos (fértiles) y azules (estériles).
-                                Analiza los gráficos y redacta un informe técnico interpretando:
-                                1. Firma adakítica en Sr/Y vs Y.
-                                2. Patrones de enriquecimiento y anomalías en el diagrama Spider.
-                                3. Tendencia calcoalcalina en el diagrama AFM.
-                                4. Estado de oxidación e implicaciones petrogenéticas.
-                                """
-                                
-                                # 4. Llamada a la API de Gemini enviando texto e imagen simultáneamente
-                                response = model.generate_content([prompt_texto, image_pil])
-                                
-                                st.success("✅ Análisis completado con éxito.")
-                                st.markdown(response.text)
-                                    
-                        except Exception as e:
-                            st.error(f"⚠️ Error al procesar la solicitud con Gemini: {e}")
-                
                 # =====================================================================
                 # PREPARACIÓN DE DESCARGAS (CSV Y GEOJSON)
                 # =====================================================================
