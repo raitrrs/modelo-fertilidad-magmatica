@@ -227,7 +227,7 @@ if archivo_subido is not None:
                                 
                                 # 2. Configurar el modelo
                                 genai.configure(api_key=api_key_gemini)
-                                modelo_ia = genai.GenerativeModel('gemini-1.5-flash')
+                                modelo_ia = genai.GenerativeModel('gemini-1.5-flash-latest')
                                 
                                 porcentaje_fert = (muestras_fertiles / total_muestras) * 100
                                 
