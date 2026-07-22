@@ -107,7 +107,7 @@ if archivo_subido is not None:
                         return f'background-color: {color}'
                     
                     st.dataframe(
-                        df_input.head(500).style.applymap(colorear_fertiles, subset=['Clasificacion_IA']), 
+                        df_input.head(500).style.map(colorear_fertiles, subset=['Clasificacion_IA']), 
                         use_container_width=True
                     )
                 
