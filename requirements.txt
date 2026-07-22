@@ -6,4 +6,5 @@ matplotlib
 seaborn
 scipy
 joblib
-google-genai
+pydeck
+google-generativeai>=0.7.0
