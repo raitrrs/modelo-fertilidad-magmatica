@@ -9,7 +9,6 @@ import json
 import pydeck as pdk
 import io
 from PIL import Image
-from google import genai
 import io
 from PIL import Image
 import base64
@@ -55,7 +54,7 @@ st.sidebar.header("🎛️ Parámetros del Modelo")
 umbral_corte = st.sidebar.slider("Umbral de Probabilidad (Corte Fértil)", 0.0, 1.0, 0.5, 0.05)
 st.sidebar.markdown("---")
 st.sidebar.header("🤖 Integración con IA")
-api_key_gemini = st.sidebar.text_input("🔑 API Key de Google Gemini", type="password", help="Obtén tu clave gratuita en Google AI Studio")
+
 
 # =====================================================================
 # ÁREA PRINCIPAL
