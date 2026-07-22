@@ -8,6 +8,8 @@ from scipy.interpolate import griddata
 import json
 import pydeck as pdk
 import google.generativeai as genai
+import io
+from PIL import Image
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
