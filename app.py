@@ -7,6 +7,7 @@ import seaborn as sns
 from scipy.interpolate import griddata
 import json
 import pydeck as pdk
+import google.generativeai as genai
 
 # =====================================================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -45,6 +46,9 @@ st.sidebar.markdown("---")
 st.sidebar.header("🎛️ Parámetros del Modelo")
 # UMBRAL DINÁMICO
 umbral_corte = st.sidebar.slider("Umbral de Probabilidad (Corte Fértil)", 0.0, 1.0, 0.5, 0.05)
+st.sidebar.markdown("---")
+st.sidebar.header("🤖 Integración con IA")
+api_key_gemini = st.sidebar.text_input("🔑 API Key de Google Gemini", type="password", help="Obtén tu clave gratuita en Google AI Studio")
 
 # =====================================================================
 # ÁREA PRINCIPAL
@@ -77,7 +81,7 @@ if archivo_subido is not None:
                 # =====================================================================
                 # CREACIÓN DE PESTAÑAS (TABS)
                 # =====================================================================
-                tab1, tab2, tab3 = st.tabs(["📄 Resumen y Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa 3D Espacial"])
+                tab1, tab2, tab3, tab4 = st.tabs(["📄 Resumen y Datos", "📉 Diagramas Geoquímicos", "🗺️ Mapa Espacial", "🤖 Asistente Gemini"])
                 
                 # ----- PESTAÑA 1: DATOS Y KPIS -----
                 with tab1:
@@ -202,6 +206,50 @@ if archivo_subido is not None:
                             st.error("⚠️ No hay coordenadas válidas para generar el mapa.")
                     else:
                         st.warning("⚠️ El archivo subido no contiene columnas de 'LATITUD' y 'LONGITUD'. No se puede generar el mapa espacial.")
+
+                # ----- PESTAÑA 4: ASISTENTE GEMINI -----
+                with tab4:
+                    st.subheader("Interpretación Geológica Asistida por IA")
+                    st.write("Esta sección utiliza Gemini para generar un informe técnico interpretando los diagramas multivariados de la Pestaña 2, basándose en la tasa de anomalías actual.")
+                    
+                    if st.button("✨ Generar Interpretación de los Gráficos"):
+                        if not api_key_gemini:
+                            st.warning("⚠️ Ingresa tu API Key de Gemini en el panel lateral para activar esta función.")
+                        else:
+                            try:
+                                with st.spinner("Gemini está analizando el contexto geoquímico..."):
+                                    # Configurar el modelo
+                                    genai.configure(api_key=api_key_gemini)
+                                    modelo_ia = genai.GenerativeModel('gemini-1.5-flash')
+                                    
+                                    # Calcular porcentaje para dar contexto a la IA
+                                    porcentaje_fert = (muestras_fertiles / total_muestras) * 100
+                                    
+                                    # Construir el prompt dinámico
+                                    prompt = f"""
+                                    Actúa como un geoquímico experto en exploración mineral. Acabo de procesar {total_muestras} muestras de roca y mi modelo de Machine Learning determinó que el {porcentaje_fert:.1f}% tienen características de 'Fertilidad Magmática'.
+                                    
+                                    Genera un informe técnico explicando qué nos indican los siguientes 6 diagramas que se generaron para estas muestras. Explica qué significa cada uno específicamente en el contexto de la evolución del magma y la prospectividad mineral:
+                                    
+                                    1. Sr/Y vs Y (Indicador de profundidad, presión y firmas adakíticas).
+                                    2. Diagrama Spider de Elementos Traza (La, Sr, Y, Zr, Ti, V, Sc, Cu, Zn, Pb - Patrones de enriquecimiento).
+                                    3. Ternario AFM (Na+K, Fe, Mg - Evolución y tendencias calcoalcalinas vs toleíticas).
+                                    4. Fe vs Cr (Fraccionamiento de fases máficas tempranas).
+                                    5. Cu vs K (Asociación con alteración potásica en sistemas porfiríticos).
+                                    6. V vs Ti (Estado de oxidación del magma f/c cristalización de magnetita).
+                                    
+                                    Estructura el informe de forma profesional, usando negritas para los nombres de los gráficos y mantén un lenguaje técnico adecuado para un reporte de exploración.
+                                    """
+                                    
+                                    # Ejecutar la llamada a la API
+                                    respuesta = modelo_ia.generate_content(prompt)
+                                    
+                                    # Mostrar el resultado
+                                    st.success("✅ Informe generado exitosamente.")
+                                    st.markdown(respuesta.text)
+                                    
+                            except Exception as e:
+                                st.error(f"⚠️ Hubo un error al conectar con Gemini: {e}")
                 # =====================================================================
                 # PREPARACIÓN DE DESCARGAS (CSV Y GEOJSON)
                 # =====================================================================
